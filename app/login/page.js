@@ -33,7 +33,7 @@ export default function LoginPage() {
         <div className="login-logo"><HomeIcon size={24} /></div>
         <h1 className="login-title">The Family Sync</h1>
         <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '-8px', marginBottom: '8px', textAlign: 'center' }}>by UCCP Sukat</p>
-        <p className="login-subtitle">Sign in to manage your family records</p>
+        <p className="login-subtitle">Managed by the Membership Committee</p>
 
         {error && <div className="login-error">{error}</div>}
 

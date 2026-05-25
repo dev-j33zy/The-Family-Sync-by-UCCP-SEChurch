@@ -10,7 +10,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="icon" href="/favicon.ico" />
         <script dangerouslySetInnerHTML={{
           __html: `
@@ -18,6 +18,12 @@ export default function RootLayout({ children }) {
               try {
                 var t = localStorage.getItem('theme') || 'dark';
                 document.documentElement.setAttribute('data-theme', t);
+                var vh = window.innerHeight;
+                document.documentElement.style.setProperty('--app-height', vh + 'px');
+                window.addEventListener('resize', function(){
+                  var vh2 = window.innerHeight;
+                  document.documentElement.style.setProperty('--app-height', vh2 + 'px');
+                });
               } catch(e){}
             })();
           `
