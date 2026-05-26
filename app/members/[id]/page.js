@@ -322,7 +322,7 @@ export default function MemberDetailPage({ params }) {
   if (loading) {
     return (
       <div className="app-layout">
-        <Sidebar user={user} />
+        <Sidebar />
         <main className="main-content">
           <div className="page-wrapper">
             <div className="card skeleton" style={{ height: '500px' }} />
@@ -335,7 +335,7 @@ export default function MemberDetailPage({ params }) {
   if (!member) {
     return (
       <div className="app-layout">
-        <Sidebar user={user} />
+        <Sidebar />
         <main className="main-content">
           <div className="page-wrapper">
             <div className="empty-state" style={{ marginTop: '80px' }}>
@@ -354,7 +354,7 @@ export default function MemberDetailPage({ params }) {
 
   return (
     <div className="app-layout">
-      <Sidebar user={user} />
+      <Sidebar />
       <main className="main-content">
         <div className="page-wrapper">
           {/* Breadcrumb */}

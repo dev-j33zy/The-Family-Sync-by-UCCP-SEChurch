@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { useUser } from '@/components/UserProvider'
 import { LayoutIcon, UsersIcon, XIcon, MenuIcon, LogOutIcon } from '@/components/Icons'
 
 const navItems = [
@@ -9,7 +10,8 @@ const navItems = [
   { href: '/members', label: 'Members', icon: UsersIcon, section: 'main' },
 ]
 
-export default function Sidebar({ user }) {
+export default function Sidebar() {
+  const user = useUser()
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -22,8 +24,8 @@ export default function Sidebar({ user }) {
     router.push('/login')
   }
 
-  const userInitial = user?.email?.charAt(0)?.toUpperCase() || 'A'
-  const userDisplayName = user?.user_metadata?.display_name || user?.email || 'Admin'
+  const userInitial = user?.email?.charAt(0)?.toUpperCase() || ''
+  const userDisplayName = user?.user_metadata?.display_name || user?.email || ''
 
   return (
     <>

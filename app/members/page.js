@@ -49,7 +49,7 @@ export default function MembersPage() {
 
   return (
     <div className="app-layout">
-      <Sidebar user={user} />
+      <Sidebar />
       <main className="main-content">
         <div className="page-wrapper">
           <div className="page-header flex items-center justify-between">

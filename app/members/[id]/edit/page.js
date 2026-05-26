@@ -27,7 +27,7 @@ export default function EditMemberPage({ params }) {
 
   return (
     <div className="app-layout">
-      <Sidebar user={user} />
+      <Sidebar />
       <main className="main-content">
         <div className="page-wrapper">
           <div className="flex items-center gap-3 mb-4">

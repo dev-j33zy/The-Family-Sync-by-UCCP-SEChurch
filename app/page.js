@@ -34,7 +34,7 @@ export default function DashboardPage() {
 
   return (
     <div className="app-layout">
-      <Sidebar user={user} />
+      <Sidebar />
       <main className="main-content">
         <div className="page-wrapper">
           {/* Header */}

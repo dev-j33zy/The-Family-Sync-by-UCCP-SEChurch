@@ -1,5 +1,6 @@
 import './globals.css'
 import ThemeProvider from '@/components/ThemeProvider'
+import UserProvider from '@/components/UserProvider'
 
 export const metadata = {
   title: 'The Family Sync',
@@ -29,7 +30,7 @@ export default function RootLayout({ children }) {
           `
         }} />
       </head>
-      <body><ThemeProvider>{children}</ThemeProvider></body>
+      <body><ThemeProvider><UserProvider>{children}</UserProvider></ThemeProvider></body>
     </html>
   )
 }
