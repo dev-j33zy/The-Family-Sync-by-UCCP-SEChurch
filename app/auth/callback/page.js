@@ -10,41 +10,56 @@ export default function AuthCallbackPage() {
 
   const [step, setStep] = useState(() => {
     if (typeof window === 'undefined') return 'exchanging'
-    const p = new URLSearchParams(window.location.search)
-    const type = p.get('type')
-    const tokenHash = p.get('token_hash')
-    const code = p.get('code')
-    if ((type === 'recovery' || type === 'signup') && tokenHash) return 'exchanging'
-    return code ? 'exchanging' : 'error'
+    const search = new URLSearchParams(window.location.search)
+    const hash = new URLSearchParams(window.location.hash.substring(1))
+    
+    if (search.get('error') || hash.get('error')) return 'error'
+    if (search.get('code')) return 'exchanging'
+    if (search.get('token_hash')) return 'exchanging'
+    if (hash.get('access_token')) return 'exchanging'
+    
+    return 'error'
   })
+
   const [mode] = useState(() => {
     if (typeof window === 'undefined') return 'invite'
-    const type = new URLSearchParams(window.location.search).get('type')
+    const search = new URLSearchParams(window.location.search)
+    const type = search.get('type')
     if (type === 'recovery') return 'recovery'
     if (type === 'signup') return 'signup'
     return 'invite'
   })
+  
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(() => {
     if (typeof window === 'undefined') return ''
-    const p = new URLSearchParams(window.location.search)
-    const type = p.get('type')
-    if ((type === 'recovery' || type === 'signup') && p.get('token_hash')) return ''
-    if (p.get('code')) return ''
+    const search = new URLSearchParams(window.location.search)
+    const hash = new URLSearchParams(window.location.hash.substring(1))
+    
+    const err = search.get('error') || hash.get('error')
+    const errDesc = search.get('error_description') || hash.get('error_description')
+    
+    if (err) return errDesc ? decodeURIComponent(errDesc.replace(/\+/g, ' ')) : 'Invalid invitation link'
+    
+    if (search.get('code') || search.get('token_hash') || hash.get('access_token')) return ''
+    
     return 'Invalid invitation link'
   })
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('code')
-    const type = params.get('type')
-    const tokenHash = params.get('token_hash')
+    const search = new URLSearchParams(window.location.search)
+    const hash = new URLSearchParams(window.location.hash.substring(1))
+    
+    const code = search.get('code')
+    const type = search.get('type')
+    const tokenHash = search.get('token_hash')
+    const accessToken = hash.get('access_token')
 
-    // Direct link (token_hash from admin.generateLink)
-    if ((type === 'recovery' || type === 'signup') && tokenHash) {
-      const otpType = type === 'recovery' ? 'recovery' : 'signup'
+    // Direct link with token_hash (from admin.generateLink)
+    if (tokenHash) {
+      const otpType = (type === 'recovery' || type === 'signup' || type === 'invite') ? type : 'invite'
       supabase.auth.verifyOtp({ type: otpType, token_hash: tokenHash }).then(({ error: err }) => {
         if (err) { setError(err.message); setStep('error') }
         else setStep('set-password')
@@ -52,13 +67,20 @@ export default function AuthCallbackPage() {
       return
     }
 
-    // No code and no recovery — handled by initial state
-    if (!code) return
+    // If there is an error in URL, don't do anything else
+    if (search.get('error') || hash.get('error')) {
+      setStep('error')
+      return
+    }
 
-    // PKCE flow (from invite or Supabase email redirect)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') setStep('set-password')
-      if (event === 'PASSWORD_RECOVERY') setStep('set-password')
+    // If neither code nor access_token is present and no token_hash, we can't do anything
+    if (!code && !accessToken) return
+
+    // PKCE flow or Implicit flow
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
+        setStep('set-password')
+      }
     })
 
     supabase.auth.getUser().then(({ data: { user } }) => {
