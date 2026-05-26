@@ -30,6 +30,9 @@ export default function CreateUserPage() {
   const [deleteMessage, setDeleteMessage] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
 
+  const [admins, setAdmins] = useState([])
+  const [adminsLoading, setAdminsLoading] = useState(true)
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -37,6 +40,13 @@ export default function CreateUserPage() {
       setUser(user)
     }
     load()
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/admin/list-users')
+      .then(r => r.json())
+      .then(data => { if (data.admins) setAdmins(data.admins) })
+      .finally(() => setAdminsLoading(false))
   }, [])
 
   async function handleSubmit(e) {
@@ -311,6 +321,39 @@ export default function CreateUserPage() {
                     {deletingUser ? 'Deleting User…' : 'Delete User'}
                   </button>
                 </form>
+              </div>
+            </div>
+            {/* Admin Users List */}
+            <div className="card">
+              <div className="card-header">
+                <h2 className="card-title" style={{ margin: 0 }}>Admin Users</h2>
+                <span className="form-hint">{admins.length} registered</span>
+              </div>
+              <div className="card-body" style={{ padding: 0 }}>
+                {adminsLoading ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
+                ) : admins.length === 0 ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No admin users found.</div>
+                ) : (
+                  <div className="table-container" style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Email</th>
+                          <th>Name</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {admins.map(a => (
+                          <tr key={a.id}>
+                            <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{a.email}</td>
+                            <td>{a.first_name || a.last_name ? `${a.first_name} ${a.last_name}`.trim() : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           </div>
