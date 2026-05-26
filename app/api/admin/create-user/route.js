@@ -17,7 +17,10 @@ export async function POST(request) {
     }
 
     const adminSupabase = createAdminSupabaseClient()
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+    const origin = request.headers.get('origin')
+    const host = request.headers.get('host') || 'localhost:3000'
+    const protocol = request.headers.get('x-forwarded-proto') || 'http'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin || `${protocol}://${host}`
 
     // Create user and send invitation email
     const { data: inviteData, error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(email, {
