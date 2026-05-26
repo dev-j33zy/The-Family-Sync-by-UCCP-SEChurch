@@ -1,8 +1,8 @@
 'use client'
 
-function Icon({ children, size = 20, className }) {
+function Icon({ children, size = 20, className, style }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
       {children}
     </svg>
   )
@@ -165,6 +165,26 @@ export function PlusIcon(props) {
     <Icon {...props}>
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
+    </Icon>
+  )
+}
+
+export function HeartIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" fill="currentColor" fillOpacity="0.4" />
+    </Icon>
+  )
+}
+
+export function BalloonIcon(props) {
+  return (
+    <Icon {...props}>
+      <g transform="rotate(45 12 12)">
+        <circle cx="12" cy="7.5" r="6.5" fill="currentColor" fillOpacity="0.4" />
+        <path d="M9.5 14.5c2.5 1.5 2.5 1.5 5 0" strokeWidth="3" strokeLinecap="round" />
+        <path d="M12 16v6.5" />
+      </g>
     </Icon>
   )
 }

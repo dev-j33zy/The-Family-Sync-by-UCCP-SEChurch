@@ -11,6 +11,29 @@ export async function GET() {
 
     if (error) throw error
 
+    const { data: relationships } = await supabase
+      .from('relationships')
+      .select('member_id, related_member_id, relationship_type')
+
+    const spouseMap = {}
+    if (relationships) {
+      const memberById = {}
+      members.forEach(m => { memberById[m.id] = m })
+
+      relationships.forEach(r => {
+        if (r.relationship_type === 'spouse') {
+          const related = memberById[r.related_member_id]
+          if (related) {
+            spouseMap[r.member_id] = `${related.first_name} ${related.last_name}`
+          }
+        }
+      })
+    }
+
+    members.forEach(m => {
+      m.spouse_name = spouseMap[m.id] || null
+    })
+
     const stats = {
       total: members.length,
       active: members.filter(m => m.membership_status === 'active').length,

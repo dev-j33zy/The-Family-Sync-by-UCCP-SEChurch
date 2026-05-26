@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { getCalendarEvents, getUpcomingEvents, MONTHS, DAYS_OF_WEEK } from '@/lib/utils'
-import { UsersIcon, CheckIcon, StarIcon, MoonIcon, CalendarIcon, BellIcon, CakeIcon, RingIcon, PartyIcon } from '@/components/Icons'
+import { UsersIcon, CheckIcon, StarIcon, MoonIcon, CalendarIcon, BellIcon, HeartIcon, BalloonIcon, PartyIcon } from '@/components/Icons'
 
 // =============================================
 // STATS CARDS
@@ -112,6 +112,18 @@ export function BirthdayCalendar({ members }) {
             const hasAnniversary = dayEvents.some(e => e.type === 'anniversary')
             const isHovered = hoveredDay === day && dayEvents.length > 0
 
+            const dayNumStyle = {}
+            if (hasBirthday && hasAnniversary) {
+              dayNumStyle.border = '2px solid transparent'
+              dayNumStyle.background = 'linear-gradient(#050203, #050203) padding-box, linear-gradient(135deg, #3B82F6, #EF4444) border-box'
+            } else if (hasBirthday) {
+              dayNumStyle.border = '2px solid #3B82F6'
+            } else if (hasAnniversary) {
+              dayNumStyle.border = '2px solid #EF4444'
+            }
+
+            const hasEvent = hasBirthday || hasAnniversary
+
             return (
               <div
                 key={day}
@@ -120,19 +132,13 @@ export function BirthdayCalendar({ members }) {
                 onMouseLeave={() => setHoveredDay(null)}
                 style={{ position: 'relative' }}
               >
-                <span className="calendar-day-num">{day}</span>
-                {dayEvents.length > 0 && (
-                  <div className="event-dots">
-                    {hasBirthday && <div className="event-dot event-dot-birthday" />}
-                    {hasAnniversary && <div className="event-dot event-dot-anniversary" />}
-                  </div>
-                )}
+                <span className={`calendar-day-num${hasEvent ? ' event' : ''}`} style={dayNumStyle}>{day}</span>
                 {isHovered && (
                   <div className="calendar-tooltip">
                     {dayEvents.map((ev, i) => (
                       <div key={i} style={{ marginBottom: i < dayEvents.length - 1 ? '4px' : 0 }}>
                         <span style={{ color: ev.type === 'birthday' ? '#3B82F6' : '#EF4444', marginRight: '4px' }}>
-                          {ev.type === 'birthday' ? <CakeIcon size={14} /> : <RingIcon size={14} />}
+                          {ev.type === 'birthday' ? <BalloonIcon size={14} /> : <HeartIcon size={14} />}
                         </span>
                         {ev.name}
                       </div>
@@ -145,11 +151,11 @@ export function BirthdayCalendar({ members }) {
         </div>
         <div className="calendar-legend">
           <div className="legend-item">
-            <div className="event-dot event-dot-birthday" />
+            <BalloonIcon size={18} style={{ color: '#3B82F6' }} />
             <span>Birthday</span>
           </div>
           <div className="legend-item">
-            <div className="event-dot event-dot-anniversary" />
+            <HeartIcon size={18} style={{ color: '#EF4444' }} />
             <span>Anniversary</span>
           </div>
         </div>
@@ -187,7 +193,7 @@ export function UpcomingReminders({ members }) {
               return (
                 <a key={i} href={`/members/${ev.memberId}`} className="reminder-item" style={{ textDecoration: 'none' }}>
                   <div className={`reminder-icon ${ev.type === 'birthday' ? 'reminder-icon-birthday' : 'reminder-icon-anniversary'}`}>
-                    {ev.type === 'birthday' ? <CakeIcon size={18} /> : <RingIcon size={18} />}
+                    {ev.type === 'birthday' ? <BalloonIcon size={18} /> : <HeartIcon size={18} />}
                   </div>
                   <div className="reminder-info">
                     <div className="reminder-name">{ev.name}</div>
