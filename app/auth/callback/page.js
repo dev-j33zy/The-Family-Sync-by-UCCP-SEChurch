@@ -73,10 +73,28 @@ export default function AuthCallbackPage() {
       return
     }
 
-    // If neither code nor access_token is present and no token_hash, we can't do anything
-    if (!code && !accessToken) return
+    // PKCE flow with code
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
+        if (err) {
+          // Detect the specific PKCE error that happens with Invite links
+          if (err.message.includes('code verifier') || err.message.includes('grant')) {
+            setError('Security mismatch (PKCE). The admin generated this invite, but you are opening it. Please ask the admin to update their Supabase Email Template to use token_hash as instructed.')
+          } else {
+            setError(err.message)
+          }
+          setStep('error')
+        } else {
+          setStep('set-password')
+        }
+      })
+      return
+    }
 
-    // PKCE flow or Implicit flow
+    // If neither code nor access_token is present and no token_hash, we can't do anything
+    if (!accessToken) return
+
+    // Implicit flow (access_token in hash)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
         setStep('set-password')
