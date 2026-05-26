@@ -171,22 +171,6 @@ export default function CreateUserPage() {
                   <strong>Name:</strong> {createdUser.first_name} {createdUser.last_name}<br />
                 </div>
               )}
-              {inviteLink && (
-                <div className="form-group" style={{ marginTop: '12px' }}>
-                  <label className="form-label">Invite link (share with user)</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input className="form-input" value={inviteLink} readOnly
-                      onClick={e => e.target.select()}
-                      style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
-                    />
-                    <button type="button" className="btn btn-secondary" onClick={copyInviteLink}
-                      style={{ whiteSpace: 'nowrap', padding: '10px 14px', flexShrink: 0 }}
-                    >
-                      {inviteCopied ? 'Copied!' : 'Copy'}
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -256,24 +240,7 @@ export default function CreateUserPage() {
               <div className="card-body">
                 {resetSent && (
                   <div className="settings-alert success" style={{ marginBottom: '12px' }}>
-                    Recovery link generated. Share it with the user.
-                  </div>
-                )}
-                {resetLink && (
-                  <div className="form-group" style={{ marginBottom: '16px' }}>
-                    <label className="form-label">Recovery link (share with user)</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input className="form-input" value={resetLink} readOnly
-                        onClick={e => e.target.select()}
-                        style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
-                      />
-                      <button type="button" className="btn btn-secondary" onClick={copyLink}
-                        style={{ whiteSpace: 'nowrap', padding: '10px 14px', flexShrink: 0 }}
-                      >
-                        {copied ? 'Copied!' : 'Copy'}
-                      </button>
-                    </div>
-                    <span className="form-hint">The link was also sent by email if available</span>
+                    Recovery link sent via email successfully.
                   </div>
                 )}
                 {resetError && (

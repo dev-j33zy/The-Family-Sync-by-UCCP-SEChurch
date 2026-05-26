@@ -36,22 +36,8 @@ export async function POST(request) {
       return NextResponse.json({ error: inviteError.message }, { status: 400 })
     }
 
-    // Generate a recovery link for direct sharing
-    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
-      type: 'recovery',
-      email,
-      options: { redirectTo: `${appUrl}/auth/callback` },
-    })
-
-    if (linkError) {
-      return NextResponse.json({ error: linkError.message }, { status: 400 })
-    }
-
-    const inviteLink = `${appUrl}/auth/callback?type=recovery&token_hash=${linkData.properties.hashed_token}`
-
     return NextResponse.json({
-      message: 'Invitation sent and link generated. Share the link below or have them check their email.',
-      link: inviteLink,
+      message: 'Invitation sent via email successfully.',
       user: {
         id: inviteData.user.id,
         email: inviteData.user.email,
