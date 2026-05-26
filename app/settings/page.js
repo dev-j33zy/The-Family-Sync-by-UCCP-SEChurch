@@ -86,6 +86,15 @@ export default function SettingsPage() {
               <h1 className="page-title" style={{ margin: 0 }}>Settings</h1>
               <p className="page-subtitle">Manage your account and preferences</p>
             </div>
+            <button
+              type="submit"
+              form="settings-form"
+              className="btn btn-primary page-action-btn"
+              disabled={saving}
+            >
+              <SaveIcon size={18} />
+              {saving ? 'Saving…' : 'Save Settings'}
+            </button>
           </div>
 
           {message && (
@@ -100,7 +109,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <form onSubmit={handleSave}>
+          <form id="settings-form" onSubmit={handleSave}>
             <div className="settings-grid">
               {/* Profile Section */}
               <div className="card">
@@ -217,18 +226,6 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Save Button */}
-            <div style={{ textAlign: 'right', marginTop: '24px' }}>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={saving}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-              >
-                <SaveIcon size={18} />
-                {saving ? 'Saving…' : 'Save Settings'}
-              </button>
-            </div>
           </form>
         </div>
       </main>

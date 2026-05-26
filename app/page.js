@@ -45,7 +45,7 @@ export default function DashboardPage() {
                 {formatDate(now.toISOString(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
             </div>
-            <Link href="/members/new" className="btn btn-primary">
+            <Link href="/members/new" className="btn btn-primary page-action-btn">
               <PlusIcon size={16} /> Add Member
             </Link>
           </div>

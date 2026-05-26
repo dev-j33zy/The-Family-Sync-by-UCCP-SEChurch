@@ -697,6 +697,12 @@ img { max-width: 100%; display: block; }
 .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
 .btn-lg { padding: 13px 24px; font-size: 1rem; }
 
+.page-action-btn {
+  min-height: 40px;
+  padding: 8px 20px;
+  font-size: 0.875rem;
+}
+
 .btn-icon {
   width: 36px;
   height: 36px;
@@ -1753,9 +1759,14 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
     gap: 12px;
   }
 
-  .page-header.flex .btn {
+  .page-header.flex .btn:not(.page-action-btn) {
     align-self: stretch;
     text-align: center;
+  }
+  .page-header.flex:has(.page-action-btn) {
+    flex-direction: row;
+    align-items: center;
+    padding-right: 0;
   }
 
   /* Breadcrumb stacking */

@@ -357,12 +357,9 @@ export default function MemberDetailPage({ params }) {
       <Sidebar />
       <main className="main-content">
         <div className="page-wrapper">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-3 mb-4">
+          <div className="page-header flex items-center justify-between">
             <Link href="/members" className="btn btn-ghost btn-sm">← Members</Link>
-            <div style={{ marginLeft: 'auto' }}>
-              <Link href="/members/new" className="btn btn-primary btn-sm"><PlusIcon size={16} /> Add Member</Link>
-            </div>
+            <Link href="/members/new" className="btn btn-primary page-action-btn"><PlusIcon size={16} /> Add Member</Link>
           </div>
 
           <div className="member-detail-grid">

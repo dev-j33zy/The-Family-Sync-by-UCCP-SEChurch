@@ -10,7 +10,8 @@ A full-stack church family membership management web app built with **Next.js 16
 - **Members** — full CRUD, search, filter, sort, paginate, communicant class tracking
 - **Profile Photos** — upload, crop to square, compress under 1MB, expand preview with replace/edit/delete
 - **Family Tree** — interactive visualization with spouse, sibling, parent, child, and grandchild relationships
-- **Auth** — Supabase Auth admin login
+- **Admin Tools** — create users, reset passwords, delete users, list registered admins
+- **Auth** — Supabase Auth admin login with invite links and password reset via email
 - **Dark/Light Theme** — toggleable theme with persistent preference
 
 ## Quick Start

@@ -55,9 +55,9 @@ export default function MembersPage() {
           <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Members</h1>
-              <p className="page-subtitle">Manage all registered family members</p>
+              <p className="page-subtitle">Manage all registered church members</p>
             </div>
-            <Link href="/members/new" className="btn btn-primary" id="add-member-btn">
+            <Link href="/members/new" className="btn btn-primary page-action-btn">
               <PlusIcon size={16} /> Add Member
             </Link>
           </div>

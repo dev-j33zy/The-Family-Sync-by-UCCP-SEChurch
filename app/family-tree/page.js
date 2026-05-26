@@ -371,7 +371,7 @@ function FamilyTreeView() {
               <h1 className="page-title">Family Tree</h1>
               <p className="page-subtitle">Visualize and manage family connections across groups</p>
             </div>
-            <Link href="/members/new" className="btn btn-primary">
+            <Link href="/members/new" className="btn btn-primary page-action-btn">
               <PlusIcon size={16} /> Add Member
             </Link>
           </div>
