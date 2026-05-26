@@ -17,24 +17,41 @@ export async function POST(request) {
     }
 
     const adminSupabase = createAdminSupabaseClient()
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
 
-    const { data, error } = await adminSupabase.auth.admin.inviteUserByEmail(email, {
+    // Create user and send invitation email
+    const { data: inviteData, error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(email, {
       data: {
         first_name,
         last_name,
         role: 'Administrator',
       },
+      redirectTo: `${appUrl}/auth/callback`,
     })
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+    if (inviteError) {
+      return NextResponse.json({ error: inviteError.message }, { status: 400 })
     }
 
+    // Generate a recovery link for direct sharing
+    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: { redirectTo: `${appUrl}/auth/callback` },
+    })
+
+    if (linkError) {
+      return NextResponse.json({ error: linkError.message }, { status: 400 })
+    }
+
+    const inviteLink = `${appUrl}/auth/callback?type=recovery&token_hash=${linkData.properties.hashed_token}`
+
     return NextResponse.json({
-      message: 'Invitation sent successfully',
+      message: 'Invitation sent and link generated. Share the link below or have them check their email.',
+      link: inviteLink,
       user: {
-        id: data.user.id,
-        email: data.user.email,
+        id: inviteData.user.id,
+        email: inviteData.user.email,
         first_name,
         last_name,
       },

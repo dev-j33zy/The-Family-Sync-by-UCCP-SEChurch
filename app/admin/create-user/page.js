@@ -17,6 +17,8 @@ export default function CreateUserPage() {
   const [message, setMessage] = useState(null)
   const [error, setError] = useState(null)
   const [createdUser, setCreatedUser] = useState(null)
+  const [inviteLink, setInviteLink] = useState(null)
+  const [inviteCopied, setInviteCopied] = useState(false)
 
   const [resetEmail, setResetEmail] = useState('')
   const [resetting, setResetting] = useState(false)
@@ -43,6 +45,7 @@ export default function CreateUserPage() {
     setMessage(null)
     setError(null)
     setCreatedUser(null)
+    setInviteLink(null)
 
     try {
       const res = await fetch('/api/admin/create-user', {
@@ -57,6 +60,7 @@ export default function CreateUserPage() {
 
       setMessage(data.message)
       setCreatedUser(data.user)
+      setInviteLink(data.link)
       setFirstName('')
       setLastName('')
       setEmail('')
@@ -105,6 +109,14 @@ export default function CreateUserPage() {
       await navigator.clipboard.writeText(resetLink)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  async function copyInviteLink() {
+    if (inviteLink) {
+      await navigator.clipboard.writeText(inviteLink)
+      setInviteCopied(true)
+      setTimeout(() => setInviteCopied(false), 2000)
     }
   }
 
@@ -157,9 +169,22 @@ export default function CreateUserPage() {
                 <div style={{ marginTop: '8px', fontSize: '0.85rem' }}>
                   <strong>Email:</strong> {createdUser.email}<br />
                   <strong>Name:</strong> {createdUser.first_name} {createdUser.last_name}<br />
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    An invitation email has been sent with instructions to set their password.
-                  </span>
+                </div>
+              )}
+              {inviteLink && (
+                <div className="form-group" style={{ marginTop: '12px' }}>
+                  <label className="form-label">Invite link (share with user)</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input className="form-input" value={inviteLink} readOnly
+                      onClick={e => e.target.select()}
+                      style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
+                    />
+                    <button type="button" className="btn btn-secondary" onClick={copyInviteLink}
+                      style={{ whiteSpace: 'nowrap', padding: '10px 14px', flexShrink: 0 }}
+                    >
+                      {inviteCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

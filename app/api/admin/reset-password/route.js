@@ -16,22 +16,27 @@ export async function POST(request) {
     }
 
     const adminSupabase = createAdminSupabaseClient()
-    const origin = new URL(request.url).origin
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
 
     const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
       type: 'recovery',
       email,
-      options: { redirectTo: `${origin}/auth/callback` },
+      options: { redirectTo: `${appUrl}/auth/callback` },
     })
 
     if (linkError) {
       return NextResponse.json({ error: linkError.message }, { status: 400 })
     }
 
-    const directLink = `${origin}/auth/callback?type=recovery&token_hash=${linkData.properties.hashed_token}`
+    // Also send the recovery email
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${appUrl}/auth/callback`,
+    })
+
+    const directLink = `${appUrl}/auth/callback?type=recovery&token_hash=${linkData.properties.hashed_token}`
 
     return NextResponse.json({
-      message: 'Recovery link generated. Share it with the user.',
+      message: 'Recovery link sent via email and generated below. Share it with the user.',
       link: directLink,
     })
   } catch (err) {

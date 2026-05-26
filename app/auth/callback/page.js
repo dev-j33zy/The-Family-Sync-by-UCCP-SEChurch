@@ -14,12 +14,15 @@ export default function AuthCallbackPage() {
     const type = p.get('type')
     const tokenHash = p.get('token_hash')
     const code = p.get('code')
-    if (type === 'recovery' && tokenHash) return 'exchanging'
+    if ((type === 'recovery' || type === 'signup') && tokenHash) return 'exchanging'
     return code ? 'exchanging' : 'error'
   })
   const [mode] = useState(() => {
     if (typeof window === 'undefined') return 'invite'
-    return new URLSearchParams(window.location.search).get('type') === 'recovery' ? 'recovery' : 'invite'
+    const type = new URLSearchParams(window.location.search).get('type')
+    if (type === 'recovery') return 'recovery'
+    if (type === 'signup') return 'signup'
+    return 'invite'
   })
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -27,7 +30,8 @@ export default function AuthCallbackPage() {
   const [error, setError] = useState(() => {
     if (typeof window === 'undefined') return ''
     const p = new URLSearchParams(window.location.search)
-    if (p.get('type') === 'recovery' && p.get('token_hash')) return ''
+    const type = p.get('type')
+    if ((type === 'recovery' || type === 'signup') && p.get('token_hash')) return ''
     if (p.get('code')) return ''
     return 'Invalid invitation link'
   })
@@ -38,9 +42,10 @@ export default function AuthCallbackPage() {
     const type = params.get('type')
     const tokenHash = params.get('token_hash')
 
-    // Direct recovery link (token_hash from admin.generateLink)
-    if (type === 'recovery' && tokenHash) {
-      supabase.auth.verifyOtp({ type: 'recovery', token_hash: tokenHash }).then(({ error: err }) => {
+    // Direct link (token_hash from admin.generateLink)
+    if ((type === 'recovery' || type === 'signup') && tokenHash) {
+      const otpType = type === 'recovery' ? 'recovery' : 'signup'
+      supabase.auth.verifyOtp({ type: otpType, token_hash: tokenHash }).then(({ error: err }) => {
         if (err) { setError(err.message); setStep('error') }
         else setStep('set-password')
       })
