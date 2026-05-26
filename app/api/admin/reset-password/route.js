@@ -21,21 +21,17 @@ export async function POST(request) {
     const protocol = request.headers.get('x-forwarded-proto') || 'http'
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin || `${protocol}://${host}`
 
-    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
-      type: 'recovery',
-      email,
-      options: { redirectTo: `${appUrl}/auth/callback` },
+    // Send the recovery email
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${appUrl}/auth/callback`,
     })
 
-    if (linkError) {
-      return NextResponse.json({ error: linkError.message }, { status: 400 })
+    if (resetError) {
+      return NextResponse.json({ error: resetError.message }, { status: 400 })
     }
 
-    const directLink = `${appUrl}/auth/callback?type=recovery&token_hash=${linkData.properties.hashed_token}`
-
     return NextResponse.json({
-      message: 'Recovery link generated successfully. Share it with the user.',
-      link: directLink,
+      message: 'Recovery link sent via email successfully.',
     })
   } catch (err) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

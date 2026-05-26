@@ -22,33 +22,25 @@ export async function POST(request) {
     const protocol = request.headers.get('x-forwarded-proto') || 'http'
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin || `${protocol}://${host}`
 
-    // Generate an invite link directly. This creates the user without triggering the automatic Supabase email.
-    // This allows us to get the exact link to display on the screen.
-    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
-      type: 'invite',
-      email,
-      options: { 
-        data: {
-          first_name,
-          last_name,
-          role: 'Administrator',
-        },
-        redirectTo: `${appUrl}/auth/callback` 
+    // Create user and send invitation email
+    const { data: inviteData, error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(email, {
+      data: {
+        first_name,
+        last_name,
+        role: 'Administrator',
       },
+      redirectTo: `${appUrl}/auth/callback`,
     })
 
-    if (linkError) {
-      return NextResponse.json({ error: linkError.message }, { status: 400 })
+    if (inviteError) {
+      return NextResponse.json({ error: inviteError.message }, { status: 400 })
     }
 
-    const inviteLink = `${appUrl}/auth/callback?type=invite&token_hash=${linkData.properties.hashed_token}`
-
     return NextResponse.json({
-      message: 'Invite link generated successfully.',
-      link: inviteLink,
+      message: 'Invitation sent via email successfully.',
       user: {
-        id: linkData.user.id,
-        email: linkData.user.email,
+        id: inviteData.user.id,
+        email: inviteData.user.email,
         first_name,
         last_name,
       },

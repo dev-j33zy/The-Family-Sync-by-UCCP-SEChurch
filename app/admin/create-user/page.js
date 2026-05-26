@@ -171,29 +171,6 @@ export default function CreateUserPage() {
                   <strong>Name:</strong> {createdUser.first_name} {createdUser.last_name}<br />
                 </div>
               )}
-              {inviteLink && (
-                <div className="form-group" style={{ marginTop: '12px' }}>
-                  <label className="form-label">Invite link (share with user)</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input className="form-input" value={inviteLink} readOnly
-                      onClick={e => e.target.select()}
-                      style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
-                    />
-                    <button type="button" className="btn btn-secondary" onClick={copyInviteLink}
-                      style={{ whiteSpace: 'nowrap', padding: '10px 14px', flexShrink: 0 }}
-                    >
-                      {inviteCopied ? 'Copied!' : 'Copy'}
-                    </button>
-                    <a 
-                      href={`mailto:${createdUser.email}?subject=Invitation to The Family Sync&body=Hello ${createdUser.first_name},%0D%0A%0D%0AYou have been invited to join The Family Sync.%0D%0A%0D%0AClick the link below to set your password and log in:%0D%0A${encodeURIComponent(inviteLink)}`}
-                      className="btn btn-primary"
-                      style={{ whiteSpace: 'nowrap', padding: '10px 14px', flexShrink: 0, textDecoration: 'none' }}
-                    >
-                      Send via Email
-                    </a>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -249,7 +226,7 @@ export default function CreateUserPage() {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}
                   >
                     <UsersIcon size={18} />
-                    {submitting ? 'Generating Link…' : 'Generate Invite Link'}
+                    {submitting ? 'Sending Invitation…' : 'Send Invitation'}
                   </button>
                 </form>
               </div>
@@ -263,30 +240,7 @@ export default function CreateUserPage() {
               <div className="card-body">
                 {resetSent && (
                   <div className="settings-alert success" style={{ marginBottom: '12px' }}>
-                    Recovery link generated. Share it with the user.
-                  </div>
-                )}
-                {resetLink && (
-                  <div className="form-group" style={{ marginBottom: '16px' }}>
-                    <label className="form-label">Recovery link (share with user)</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input className="form-input" value={resetLink} readOnly
-                        onClick={e => e.target.select()}
-                        style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
-                      />
-                      <button type="button" className="btn btn-secondary" onClick={copyLink}
-                        style={{ whiteSpace: 'nowrap', padding: '10px 14px', flexShrink: 0 }}
-                      >
-                        {copied ? 'Copied!' : 'Copy'}
-                      </button>
-                      <a 
-                        href={`mailto:${resetEmail}?subject=Password Reset for The Family Sync&body=Click the link below to reset your password:%0D%0A%0D%0A${encodeURIComponent(resetLink)}`}
-                        className="btn btn-primary"
-                        style={{ whiteSpace: 'nowrap', padding: '10px 14px', flexShrink: 0, textDecoration: 'none' }}
-                      >
-                        Send via Email
-                      </a>
-                    </div>
+                    Recovery link sent via email successfully.
                   </div>
                 )}
                 {resetError && (
@@ -305,7 +259,7 @@ export default function CreateUserPage() {
                       onChange={e => setResetEmail(e.target.value)}
                       required
                     />
-                    <span className="form-hint">A reset link will be generated for this email</span>
+                    <span className="form-hint">A reset link will be sent to this email</span>
                   </div>
                   <button
                     type="submit"
@@ -314,7 +268,7 @@ export default function CreateUserPage() {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}
                   >
                     <SaveIcon size={18} />
-                    {resetting ? 'Generating Reset Link…' : 'Generate Reset Link'}
+                    {resetting ? 'Sending Reset Link…' : 'Send Reset Link'}
                   </button>
                 </form>
               </div>
