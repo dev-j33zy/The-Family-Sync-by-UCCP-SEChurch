@@ -19,26 +19,21 @@
 
   --border: rgba(255, 255, 255, 0.08);
   --border-hover: rgba(255, 255, 255, 0.15);
-  --border-focus: rgba(0, 105, 137, 0.5);
+  --border-focus: rgba(107, 14, 30, 0.5);
 
-  /* Brand — SEC Red */
-  --sec-red: #6b0e1e;
-  --sec-red-dark: #4a0a15;
-  --sec-gold: #f5de8d;
+  /* Primary — SEC Burgundy */
+  --primary: #6b0e1e;
+  --primary-dark: #4a0a15;
+  --primary-light: rgba(107, 14, 30, 0.12);
+  --primary-glow: 0 0 24px rgba(107, 14, 30, 0.25);
 
-  /* Primary — Deep Teal */
-  --primary: #006989;
-  --primary-dark: #004D6E;
-  --primary-light: rgba(0, 105, 137, 0.12);
-  --primary-glow: 0 0 24px rgba(0, 105, 137, 0.25);
+  /* Accent — SEC Gold */
+  --accent: #f5de8d;
 
-  /* Accent — Light Gray */
-  --accent: #eaebed;
-
-  /* Secondary — Steel Blue (adjacent to teal) */
-  --secondary: #5B8FAC;
-  --secondary-light: rgba(91, 143, 172, 0.12);
-  --secondary-glow: 0 0 24px rgba(91, 143, 172, 0.2);
+  /* Secondary — Warm Gold */
+  --secondary: #d4a843;
+  --secondary-light: rgba(212, 168, 67, 0.12);
+  --secondary-glow: 0 0 24px rgba(212, 168, 67, 0.2);
 
   /* Status Colors */
   --green: #10B981;
@@ -191,7 +186,7 @@ img { max-width: 100%; display: block; }
 }
 
 .sidebar-brand span {
-  color: var(--primary);
+  color: var(--sec-gold);
 }
 
 .sidebar-nav {
@@ -233,7 +228,7 @@ img { max-width: 100%; display: block; }
 .nav-item.active {
   background: var(--primary-light);
   color: var(--primary);
-  border-color: rgba(0, 105, 137, 0.2);
+  border-color: rgba(107, 14, 30, 0.2);
 }
 
 .nav-item-icon {
@@ -505,22 +500,7 @@ img { max-width: 100%; display: block; }
   background: var(--primary-light);
   color: var(--primary);
   font-weight: 700;
-  border: 1px solid rgba(0, 105, 137, 0.2);
-}
-
-.calendar-day.empty { cursor: default; }
-.calendar-day.empty:hover { background: transparent; }
-
-.calendar-day-num { line-height: 1; }
-.calendar-day-num.event {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 600;
+  border: 1px solid rgba(107, 14, 30, 0.2);
 }
 
 .calendar-tooltip {
@@ -670,10 +650,10 @@ img { max-width: 100%; display: block; }
 .btn-secondary {
   background: var(--secondary-light);
   color: var(--secondary);
-  border-color: rgba(91, 143, 172, 0.2);
+  border-color: rgba(212, 168, 67, 0.2);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: rgba(91, 143, 172, 0.2);
+  background: rgba(212, 168, 67, 0.2);
 }
 
 .btn-ghost {
@@ -782,7 +762,7 @@ img { max-width: 100%; display: block; }
 .form-textarea:focus {
   border-color: var(--border-focus);
   background: var(--bg-input-focus);
-  box-shadow: 0 0 0 3px rgba(0, 105, 137, 0.1);
+  box-shadow: 0 0 0 3px rgba(107, 14, 30, 0.1);
 }
 
 .form-input[readonly] {
@@ -1028,8 +1008,8 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 50% at 20% 50%, rgba(0, 105, 137, 0.07) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 60% at 80% 30%, rgba(91, 143, 172, 0.07) 0%, transparent 70%);
+    radial-gradient(ellipse 60% 50% at 20% 50%, rgba(107, 14, 30, 0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 80% 30%, rgba(212, 168, 67, 0.07) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -1161,7 +1141,7 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
 
 .tree-card-inner.center-card {
   background: var(--primary-light);
-  border-color: rgba(0, 105, 137, 0.3);
+  border-color: rgba(107, 14, 30, 0.3);
   width: 140px;
   padding: 16px;
 }
@@ -1390,7 +1370,7 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
 }
 
 .pagination-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-.pagination-btn.active { background: var(--primary-light); color: var(--primary); border-color: rgba(0, 105, 137, 0.2); font-weight: 700; }
+.pagination-btn.active { background: var(--primary-light); color: var(--primary); border-color: rgba(107, 14, 30, 0.2); font-weight: 700; }
 
 /* =============================================
    ANIMATIONS
@@ -1428,7 +1408,7 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
 
   --border: rgba(0, 0, 0, 0.08);
   --border-hover: rgba(0, 0, 0, 0.15);
-  --border-focus: rgba(0, 105, 137, 0.5);
+  --border-focus: rgba(107, 14, 30, 0.5);
 
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
@@ -1523,7 +1503,10 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
 [data-theme="light"] .badge-active { background: #D1FAE5; color: #047857; }
 [data-theme="light"] .badge-dormant { background: #FEF3C7; color: #B45309; }
 [data-theme="light"] .badge-cancelled { background: #FEE2E2; color: #B91C1C; }
-[data-theme="light"] .badge-regular { background: rgba(91, 143, 172, 0.12); color: #2C6B85; }
+[data-theme="light"] .badge-active { background: #D1FAE5; color: #047857; }
+[data-theme="light"] .badge-dormant { background: #FEF3C7; color: #B45309; }
+[data-theme="light"] .badge-cancelled { background: #FEE2E2; color: #B91C1C; }
+[data-theme="light"] .badge-regular { background: rgba(107, 14, 30, 0.12); color: #6b0e1e; }
 [data-theme="light"] .badge-associate { background: rgba(16, 185, 129, 0.12); color: #059669; }
 [data-theme="light"] .badge-affiliate { background: rgba(245, 158, 11, 0.12); color: #D97706; }
 
@@ -1764,8 +1747,8 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 50% at 20% 50%, rgba(0, 105, 137, 0.07) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 60% at 80% 30%, rgba(91, 143, 172, 0.07) 0%, transparent 70%);
+    radial-gradient(ellipse 60% 50% at 20% 50%, rgba(107, 14, 30, 0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 80% 30%, rgba(212, 168, 67, 0.07) 0%, transparent 70%);
   pointer-events: none;
 }
 
