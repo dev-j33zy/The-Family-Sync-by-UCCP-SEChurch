@@ -142,9 +142,9 @@ export default function MemberForm({ member, mode = 'create' }) {
               onChange={e => set('middle_name', e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label" htmlFor="gender">Gender</label>
+            <label className="form-label" htmlFor="gender">Gender <span className="required">*</span></label>
             <select id="gender" className="form-select" value={form.gender}
-              onChange={e => set('gender', e.target.value)}>
+              onChange={e => set('gender', e.target.value)} required>
               <option value="">Select gender</option>
               <option value="male">Male</option>
               <option value="female">Female</option>

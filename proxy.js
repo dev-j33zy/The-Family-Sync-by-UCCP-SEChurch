@@ -30,6 +30,7 @@ export async function proxy(request) {
 
   const { pathname, searchParams } = request.nextUrl
   const isLoginPage = pathname.startsWith('/login')
+  const isRegisterPage = pathname.startsWith('/register')
   const isApiRoute = pathname.startsWith('/api')
   const isPublicAsset = pathname.startsWith('/_next') || pathname.startsWith('/favicon')
   const isAuthRoute = pathname.startsWith('/auth')
@@ -42,7 +43,7 @@ export async function proxy(request) {
     return NextResponse.redirect(url)
   }
 
-  if (!user && !isLoginPage && !isApiRoute && !isPublicAsset && !isAuthRoute) {
+  if (!user && !isLoginPage && !isRegisterPage && !isApiRoute && !isPublicAsset && !isAuthRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

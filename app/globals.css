@@ -957,8 +957,9 @@ img { max-width: 100%; display: block; }
 }
 
 @media (max-width: 768px) {
-  .settings-grid {
+  .import-export-grid {
     grid-template-columns: 1fr;
+    gap: 24px;
   }
 }
 
@@ -1582,6 +1583,399 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* =============================================
+   IMPORT / EXPORT
+   ============================================= */
+.import-export-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+.import-section,
+.export-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.import-export-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.import-export-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.import-export-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.import-controls,
+.export-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.file-input {
+  display: none;
+}
+
+.file-input-label {
+  cursor: pointer;
+}
+
+.export-format-select {
+  max-width: 180px;
+}
+
+.progress-container {
+  margin-top: 8px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-input);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  display: block;
+}
+
+.import-unmapped-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--amber-light);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: var(--amber);
+  margin-bottom: 16px;
+}
+
+.import-preview-stats {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.import-stat strong {
+  color: var(--text-primary);
+}
+
+.import-stat-valid {
+  color: var(--green) !important;
+}
+
+.import-stat-error {
+  color: var(--rose) !important;
+}
+
+.import-row-error td {
+  background: rgba(244, 63, 94, 0.03);
+}
+
+.import-cell-missing {
+  color: var(--rose);
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .import-export-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .export-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .export-format-select {
+    max-width: 100%;
+  }
+}
+
+[data-theme="light"] .import-row-error td {
+  background: rgba(244, 63, 94, 0.05);
+}
+
+/* =============================================
+   REGISTRATION PAGE
+   ============================================= */
+.register-page {
+  min-height: var(--app-height);
+  height: var(--app-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+}
+
+.register-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 50%, rgba(0, 105, 137, 0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 80% 30%, rgba(91, 143, 172, 0.07) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.register-card {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(40px);
+  position: relative;
+  z-index: 1;
+  box-shadow: var(--shadow-lg);
+  padding: 40px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.register-card-wide {
+  max-width: 720px;
+}
+
+.register-card-narrow {
+  max-width: 480px;
+}
+
+.register-logo {
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--accent);
+  margin: 0 auto 20px;
+}
+
+.register-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: -0.03em;
+  margin-bottom: 6px;
+}
+
+.register-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.register-dpa-content {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.register-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.register-checkbox {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+}
+
+.register-btn {
+  height: 48px;
+  font-size: 1rem;
+}
+
+.register-success-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--green-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+[data-theme="light"] .register-card {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+[data-theme="light"] .register-dpa-content {
+  background: var(--bg-tertiary);
+}
+
+.register-duplicate-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--amber-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.register-compare-section {
+  margin-top: 20px;
+}
+
+.register-compare-heading {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.register-compare-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.register-compare-header {
+  display: grid;
+  grid-template-columns: 36px 1.2fr 1fr;
+  gap: 0;
+  background: var(--bg-input);
+  padding: 10px 14px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--border);
+}
+
+.register-compare-row {
+  display: grid;
+  grid-template-columns: 36px 1.2fr 1fr;
+  gap: 0;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  transition: var(--transition-fast);
+}
+
+.register-compare-row:last-child {
+  border-bottom: none;
+}
+
+.register-compare-row.register-compare-diff {
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.register-compare-row.register-compare-diff:hover {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.register-compare-row.register-compare-unchecked {
+  opacity: 0.5;
+}
+
+.register-compare-diff .register-compare-col-new {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.register-compare-col-field {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.register-compare-col-check {
+  display: flex;
+  align-items: center;
+}
+
+.register-compare-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.register-compare-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+[data-theme="light"] .register-compare-row.register-compare-diff {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+[data-theme="light"] .register-compare-header {
+  background: var(--bg-tertiary);
+}
+
+@media (max-width: 600px) {
+  .register-card {
+    padding: 24px;
+  }
+  .register-card-wide {
+    max-width: 100%;
+  }
+  .register-compare-actions {
+    flex-direction: column;
+  }
 }
 
 .animate-fade-in { animation: fadeIn 0.3s ease; }
