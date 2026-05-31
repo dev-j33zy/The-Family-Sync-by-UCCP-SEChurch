@@ -21,6 +21,11 @@
   --border-hover: rgba(255, 255, 255, 0.15);
   --border-focus: rgba(107, 14, 30, 0.5);
 
+  /* Brand — SEC Red / Gold */
+  --sec-red: #6b0e1e;
+  --sec-red-dark: #4a0a15;
+  --sec-gold: #f5de8d;
+
   /* Primary — SEC Burgundy */
   --primary: #6b0e1e;
   --primary-dark: #4a0a15;
