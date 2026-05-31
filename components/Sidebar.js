@@ -32,7 +32,7 @@ export default function Sidebar() {
       {/* Mobile Topbar */}
       <div className="mobile-topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="sidebar-logo-mark" style={{ width: '32px', height: '32px', fontSize: '1rem', marginBottom: 0 }}></div>
+          <div className="sidebar-logo-mark" style={{ width: '32px', height: '32px', fontSize: '0.75rem', marginBottom: 0 }}>SEC</div>
           <div>
             <div className="sidebar-brand">
               The Family <span>Sync</span>
@@ -51,7 +51,7 @@ export default function Sidebar() {
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         {/* Logo (Hidden on mobile) */}
         <div className="sidebar-logo desktop-only">
-          <div className="sidebar-logo-mark"></div>
+          <div className="sidebar-logo-mark">SEC</div>
           <div className="sidebar-brand">
             The Family <span>Sync</span>
           </div>

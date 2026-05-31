@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { HomeIcon } from '@/components/Icons'
+
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -138,7 +138,7 @@ export default function AuthCallbackPage() {
     <div className="login-page">
       <div className="login-bg" />
       <div className="login-card animate-fade-in-up">
-        <div className="login-logo"><HomeIcon size={24} /></div>
+        <div className="login-logo">SEC</div>
         <h1 className="login-title">The Family Sync</h1>
 
         {step === 'exchanging' && (
