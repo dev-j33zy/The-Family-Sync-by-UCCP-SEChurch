@@ -5,6 +5,16 @@ import UserProvider from '@/components/UserProvider'
 export const metadata = {
   title: 'The Family Sync',
   description: 'Family membership management — track members, family trees, birthdays, and anniversaries.',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico' },
+    ],
+    apple: { url: '/favicon.svg' },
+  },
+  other: {
+    'theme-color': '#6b0e1e',
+  },
 }
 
 export default function RootLayout({ children }) {
@@ -12,8 +22,6 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <link rel="alternate icon" href="/favicon.ico" />
         <script dangerouslySetInnerHTML={{
           __html: `
             (function(){
