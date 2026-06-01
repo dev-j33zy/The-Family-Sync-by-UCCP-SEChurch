@@ -23,6 +23,9 @@ export async function GET(request) {
         first_name: u.user_metadata?.first_name || '',
         last_name: u.user_metadata?.last_name || '',
         created_at: u.created_at,
+        email_confirmed_at: u.email_confirmed_at,
+        last_sign_in_at: u.last_sign_in_at,
+        confirmed_at: u.confirmed_at,
       }))
 
     return NextResponse.json({ admins })

@@ -6,11 +6,8 @@ export const metadata = {
   title: 'The Family Sync',
   description: 'Family membership management — track members, family trees, birthdays, and anniversaries.',
   icons: {
-    icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico' },
-    ],
-    apple: { url: '/favicon.svg' },
+    icon: { url: '/favicon.svg?v=2', type: 'image/svg+xml' },
+    apple: { url: '/favicon.svg?v=2' },
   },
   other: {
     'theme-color': '#6b0e1e',

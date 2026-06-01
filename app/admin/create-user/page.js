@@ -3,7 +3,15 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
-import { UsersIcon, ArrowLeftIcon, SaveIcon, TrashIcon } from '@/components/Icons'
+import { UsersIcon, ArrowLeftIcon, SaveIcon, TrashIcon, CheckIcon } from '@/components/Icons'
+
+function isRecent(dateStr, days = 7) {
+  if (!dateStr) return false
+  const then = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now - then
+  return diffMs >= 0 && diffMs < days * 24 * 60 * 60 * 1000
+}
 
 export default function CreateUserPage() {
   const supabase = createClient()
@@ -347,7 +355,22 @@ export default function CreateUserPage() {
                         {admins.map(a => (
                           <tr key={a.id}>
                             <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{a.email}</td>
-                            <td>{a.first_name || a.last_name ? `${a.first_name} ${a.last_name}`.trim() : '—'}</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span>{a.first_name || a.last_name ? `${a.first_name} ${a.last_name}`.trim() : '—'}</span>
+                                {a.email_confirmed_at && (
+                                  <span className="badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <CheckIcon size={12} /> Verified
+                                  </span>
+                                )}
+                                {isRecent(a.created_at) && (
+                                  <span className="badge badge-new">New</span>
+                                )}
+                                {!a.email_confirmed_at && !isRecent(a.created_at) && (
+                                  <span className="badge badge-dormant">Invited</span>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
