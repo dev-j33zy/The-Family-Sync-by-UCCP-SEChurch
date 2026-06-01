@@ -358,15 +358,13 @@ export default function CreateUserPage() {
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                 <span>{a.first_name || a.last_name ? `${a.first_name} ${a.last_name}`.trim() : '—'}</span>
-                                {a.email_confirmed_at && (
+                                {a.email_confirmed_at ? (
                                   <span className="badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                     <CheckIcon size={12} /> Verified
                                   </span>
-                                )}
-                                {isRecent(a.created_at) && (
+                                ) : isRecent(a.created_at) ? (
                                   <span className="badge badge-new">New</span>
-                                )}
-                                {!a.email_confirmed_at && !isRecent(a.created_at) && (
+                                ) : (
                                   <span className="badge badge-dormant">Invited</span>
                                 )}
                               </div>
