@@ -91,7 +91,13 @@ export default function MemberTable({ members, onDelete }) {
             onChange={e => { setSearch(e.target.value); setPage(1) }}
           />
         </div>
-        <select id="filter-status" className="form-select filter-select" value={filterStatus}
+        <input
+          className="form-input filter-select"
+          placeholder="Address area (village/barangay)"
+          value={filterAddressArea}
+          onChange={e => { setFilterAddressArea(e.target.value); setPage(1) }}
+        />
+        <select id="filter-status" className="form-select filter-select filter-dropdown" value={filterStatus}
           onChange={e => { setFilterStatus(e.target.value); setPage(1) }}>
           <option value="">Membership Status</option>
           <option value="new">New</option>
@@ -99,25 +105,19 @@ export default function MemberTable({ members, onDelete }) {
           <option value="dormant">Dormant</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <select id="filter-type" className="form-select filter-select" value={filterType}
+        <select id="filter-type" className="form-select filter-select filter-dropdown" value={filterType}
           onChange={e => { setFilterType(e.target.value); setPage(1) }}>
           <option value="">Membership Type</option>
           <option value="regular">Regular</option>
           <option value="associate">Associate</option>
           <option value="affiliate">Affiliate</option>
         </select>
-        <select id="filter-gender" className="form-select filter-select" value={filterGender}
+        <select id="filter-gender" className="form-select filter-select filter-dropdown" value={filterGender}
           onChange={e => { setFilterGender(e.target.value); setPage(1) }}>
           <option value="">All Genders</option>
           <option value="male">Male</option>
           <option value="female">Female</option>
         </select>
-        <input
-          className="form-input filter-select"
-          placeholder="Address area (village/barangay)"
-          value={filterAddressArea}
-          onChange={e => { setFilterAddressArea(e.target.value); setPage(1) }}
-        />
         {(search || filterStatus || filterType || filterGender || filterAddressArea) && (
           <button className="btn btn-ghost btn-sm" onClick={() => {
             setSearch(''); setFilterStatus(''); setFilterType(''); setFilterGender(''); setFilterAddressArea(''); setPage(1)

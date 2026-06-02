@@ -1015,6 +1015,13 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
   min-width: 140px;
 }
 
+.filter-dropdown {
+  flex: 0.7;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: 0.75rem;
+}
+
 /* =============================================
    LOGIN PAGE
    ============================================= */
