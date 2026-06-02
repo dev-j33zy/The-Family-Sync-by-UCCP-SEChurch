@@ -29,7 +29,7 @@ export async function GET(request) {
     }
     if (search) {
       query = query.or(
-        `first_name.ilike.%${search}%,last_name.ilike.%${search}%,middle_name.ilike.%${search}%`
+        `first_name.ilike.${search}%,last_name.ilike.${search}%,first_name.ilike.% ${search}%,last_name.ilike.% ${search}%`
       )
     }
 

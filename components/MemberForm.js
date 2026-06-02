@@ -366,7 +366,6 @@ export default function MemberForm({ member, mode = 'create' }) {
                         }}>{initials}</div>
                         <div>
                           <div style={{ fontWeight: 600 }}>{m.first_name} {m.last_name}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{m.gender}</div>
                         </div>
                       </div>
                     )
