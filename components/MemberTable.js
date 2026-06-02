@@ -35,6 +35,7 @@ export default function MemberTable({ members, onDelete }) {
         m.first_name?.toLowerCase().includes(q) ||
         m.last_name?.toLowerCase().includes(q) ||
         m.middle_name?.toLowerCase().includes(q) ||
+        String(calculateAge(m.date_of_birth) ?? '').includes(q) ||
         m.citizenship?.toLowerCase().includes(q)
       )
     }
