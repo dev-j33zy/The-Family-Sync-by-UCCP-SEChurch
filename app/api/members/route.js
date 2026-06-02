@@ -16,11 +16,17 @@ export async function GET(request) {
     const gender = searchParams.get('gender')
     const search = searchParams.get('search')
     const family_group_id = searchParams.get('family_group_id')
+    const address_area = searchParams.get('address_area')
 
     if (status) query = query.eq('membership_status', status)
     if (type) query = query.eq('membership_type', type)
     if (gender) query = query.eq('gender', gender)
     if (family_group_id) query = query.eq('family_group_id', family_group_id)
+    if (address_area) {
+      query = query.or(
+        `village.ilike.%${address_area}%,barangay.ilike.%${address_area}%`
+      )
+    }
     if (search) {
       query = query.or(
         `first_name.ilike.%${search}%,last_name.ilike.%${search}%,middle_name.ilike.%${search}%`

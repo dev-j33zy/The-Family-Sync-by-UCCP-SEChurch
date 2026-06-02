@@ -90,6 +90,8 @@ export function BirthdayCalendar({ members }) {
   for (let i = 0; i < firstDay; i++) cells.push(null)
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
 
+  const hoveredDayEvents = hoveredDay ? (events[hoveredDay] || []) : []
+
   return (
     <div className="card">
       <div className="card-header">
@@ -100,7 +102,7 @@ export function BirthdayCalendar({ members }) {
           <button className="calendar-nav-btn" onClick={nextMonth}>›</button>
         </div>
       </div>
-      <div className="card-body">
+      <div className="card-body birthday-calendar-body">
         <div className="calendar-grid">
           {DAYS_OF_WEEK.map(d => (
             <div key={d} className="calendar-day-header">{d}</div>
@@ -112,14 +114,32 @@ export function BirthdayCalendar({ members }) {
             const hasAnniversary = dayEvents.some(e => e.type === 'anniversary')
             const isHovered = hoveredDay === day && dayEvents.length > 0
 
-            const dayNumStyle = {}
+            const dayCircleStyle = {}
             if (hasBirthday && hasAnniversary) {
-              dayNumStyle.border = '2px solid transparent'
-              dayNumStyle.background = 'linear-gradient(#050203, #050203) padding-box, linear-gradient(135deg, #3B82F6, #EF4444) border-box'
+              dayCircleStyle.border = '2px solid transparent'
+              dayCircleStyle.background = 'linear-gradient(#050203, #050203) padding-box, linear-gradient(135deg, #3B82F6, #EF4444) border-box'
+              dayCircleStyle.borderRadius = '50%'
+              dayCircleStyle.width = '28px'
+              dayCircleStyle.height = '28px'
+              dayCircleStyle.display = 'flex'
+              dayCircleStyle.alignItems = 'center'
+              dayCircleStyle.justifyContent = 'center'
             } else if (hasBirthday) {
-              dayNumStyle.border = '2px solid #3B82F6'
+              dayCircleStyle.border = '2px solid #3B82F6'
+              dayCircleStyle.borderRadius = '50%'
+              dayCircleStyle.width = '28px'
+              dayCircleStyle.height = '28px'
+              dayCircleStyle.display = 'flex'
+              dayCircleStyle.alignItems = 'center'
+              dayCircleStyle.justifyContent = 'center'
             } else if (hasAnniversary) {
-              dayNumStyle.border = '2px solid #EF4444'
+              dayCircleStyle.border = '2px solid #EF4444'
+              dayCircleStyle.borderRadius = '50%'
+              dayCircleStyle.width = '28px'
+              dayCircleStyle.height = '28px'
+              dayCircleStyle.display = 'flex'
+              dayCircleStyle.alignItems = 'center'
+              dayCircleStyle.justifyContent = 'center'
             }
 
             const hasEvent = hasBirthday || hasAnniversary
@@ -130,25 +150,40 @@ export function BirthdayCalendar({ members }) {
                 className={`calendar-day${isToday(day) ? ' today' : ''}`}
                 onMouseEnter={() => dayEvents.length > 0 && setHoveredDay(day)}
                 onMouseLeave={() => setHoveredDay(null)}
-                style={{ position: 'relative' }}
               >
-                <span className={`calendar-day-num${hasEvent ? ' event' : ''}`} style={dayNumStyle}>{day}</span>
-                {isHovered && (
-                  <div className="calendar-tooltip">
-                    {dayEvents.map((ev, i) => (
-                      <div key={i} style={{ marginBottom: i < dayEvents.length - 1 ? '4px' : 0 }}>
-                        <span style={{ color: ev.type === 'birthday' ? '#3B82F6' : '#EF4444', marginRight: '4px' }}>
-                          {ev.type === 'birthday' ? <BalloonIcon size={14} /> : <HeartIcon size={14} />}
-                        </span>
-                        {ev.name}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <span className={`calendar-day-num${hasEvent ? ' event' : ''}`} style={dayCircleStyle}>{day}</span>
+                <div className="calendar-tooltip-desktop">
+                  {isHovered && (
+                    <div className="calendar-tooltip">
+                      {dayEvents.map((ev, i) => (
+                        <div key={i} style={{ marginBottom: i < dayEvents.length - 1 ? '4px' : 0 }}>
+                          <span style={{ color: ev.type === 'birthday' ? '#3B82F6' : '#EF4444', marginRight: '4px' }}>
+                            {ev.type === 'birthday' ? <BalloonIcon size={14} /> : <HeartIcon size={14} />}
+                          </span>
+                          {ev.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )
           })}
         </div>
+        {hoveredDayEvents.length > 0 && (
+          <div className="calendar-tooltip-mobile">
+            <div className="calendar-tooltip">
+              {hoveredDayEvents.map((ev, i) => (
+                <div key={i} style={{ marginBottom: i < hoveredDayEvents.length - 1 ? '4px' : 0 }}>
+                  <span style={{ color: ev.type === 'birthday' ? '#3B82F6' : '#EF4444', marginRight: '4px' }}>
+                    {ev.type === 'birthday' ? <BalloonIcon size={14} /> : <HeartIcon size={14} />}
+                  </span>
+                  {ev.name} · {ev.type === 'birthday' ? 'Birthday' : 'Anniversary'}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="calendar-legend">
           <div className="legend-item">
             <BalloonIcon size={18} style={{ color: '#3B82F6' }} />

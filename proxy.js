@@ -4,6 +4,10 @@ import { NextResponse } from 'next/server'
 export async function proxy(request) {
   let supabaseResponse = NextResponse.next({ request })
 
+  // Detect if the request is over HTTPS (for Secure cookie flag)
+  const proto = request.headers.get('x-forwarded-proto') || 'http'
+  const isHttps = proto === 'https'
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -13,13 +17,18 @@ export async function proxy(request) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value, options)
+          // request.cookies.set() only accepts (name, value) — no options
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
           )
           supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
+          cookiesToSet.forEach(({ name, value, options }) => {
+            // Strip Secure flag on HTTP so LAN/mobile (non-localhost) can receive cookies
+            const cookieOptions = isHttps
+              ? options
+              : { ...options, secure: false }
+            supabaseResponse.cookies.set(name, value, cookieOptions)
+          })
         },
       },
     }

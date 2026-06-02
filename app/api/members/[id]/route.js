@@ -30,7 +30,7 @@ export async function PUT(request, { params }) {
       'relationship_status', 'wedding_anniversary',
       'communicant_class_graduate',
       'date_of_membership', 'membership_status', 'membership_type',
-      'phone_number', 'email_address', 'home_address', 'family_group_id',
+      'phone_number', 'email_address', 'street_address', 'village', 'barangay', 'city', 'family_group_id',
       'profile_picture',
     ]
 

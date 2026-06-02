@@ -33,6 +33,11 @@ function DetailField({ label, value }) {
   )
 }
 
+function getCombinedAddress(member) {
+  const parts = [member.street_address, member.village, member.barangay, member.city]
+  return parts.filter(Boolean).join(', ') || null
+}
+
 function RelCard({ rel, onRemove }) {
   const m = rel.related_member
   if (!m) return null
@@ -414,16 +419,16 @@ export default function MemberDetailPage({ params }) {
               </div>
 
               {/* Contact info */}
-              {(member.phone_number || member.email_address || member.home_address) && (
+              {(member.phone_number || member.email_address || getCombinedAddress(member)) && (
                 <div style={{ padding: '0 28px 28px' }}>
                   <div className="form-section-title" style={{ marginBottom: '16px' }}>Contact Information</div>
                   <div className="detail-grid" style={{ padding: 0 }}>
                     {member.phone_number && <DetailField label="Phone" value={member.phone_number} />}
                     {member.email_address && <DetailField label="Email" value={member.email_address} />}
-                    {member.home_address && (
+                    {getCombinedAddress(member) && (
                       <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
                         <div className="detail-label">Home Address</div>
-                        <div className="detail-value">{member.home_address}</div>
+                        <div className="detail-value">{getCombinedAddress(member)}</div>
                       </div>
                     )}
                   </div>

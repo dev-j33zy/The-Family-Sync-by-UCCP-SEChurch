@@ -50,9 +50,14 @@ const COLUMN_MAP = {
   'email address': 'email_address',
   'email': 'email_address',
   'e-mail': 'email_address',
-  'home address': 'home_address',
-  'address': 'home_address',
-  'street address': 'home_address',
+  'street address': 'street_address',
+  'village': 'village',
+  'barangay': 'barangay',
+  'brgy': 'barangay',
+  'city': 'city',
+  'municipality': 'city',
+  'home address': 'street_address',
+  'address': 'street_address',
 }
 
 const REQUIRED_FIELDS = ['last_name', 'first_name', 'date_of_birth', 'gender']
@@ -292,7 +297,7 @@ export default function SettingsPage() {
     try {
       const { data: members, error } = await supabase
         .from('members')
-        .select('last_name, first_name, middle_name, date_of_birth, gender, citizenship, relationship_status, wedding_anniversary, communicant_class_graduate, date_of_membership, membership_status, membership_type, phone_number, email_address, home_address')
+        .select('last_name, first_name, middle_name, date_of_birth, gender, citizenship, relationship_status, wedding_anniversary, communicant_class_graduate, date_of_membership, membership_status, membership_type, phone_number, email_address, street_address, village, barangay, city')
         .order('last_name', { ascending: true })
 
       if (error) throw error
@@ -314,7 +319,10 @@ export default function SettingsPage() {
         'Membership Type': m.membership_type || '',
         'Phone Number': m.phone_number || '',
         'Email Address': m.email_address || '',
-        'Home Address': m.home_address || '',
+        'Street Address': m.street_address || '',
+        'Village': m.village || '',
+        'Barangay': m.barangay || '',
+        'City': m.city || '',
       }))
 
       setExportProgress({ message: 'Generating file...', percent: 80 })
@@ -438,10 +446,13 @@ export default function SettingsPage() {
                       className="file-input"
                       id="import-file-input"
                     />
-                    <label htmlFor="import-file-input" className="btn btn-secondary btn-sm file-input-label">
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
                       <FileIcon size={16} />
                       Choose File
-                    </label>
+                    </button>
                   </div>
                   {importProgress && (
                     <div className="progress-container">
@@ -478,7 +489,7 @@ export default function SettingsPage() {
                       <option value="csv">CSV (.csv)</option>
                     </select>
                     <button
-                      className="btn btn-secondary btn-sm"
+                      className="btn btn-primary"
                       onClick={handleExport}
                       disabled={exporting}
                     >

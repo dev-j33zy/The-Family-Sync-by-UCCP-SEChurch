@@ -36,7 +36,10 @@ const EMPTY_FORM = {
   membership_type: '',
   phone_number: '',
   email_address: '',
-  home_address: '',
+  street_address: '',
+  village: '',
+  barangay: '',
+  city: '',
   profile_picture: '',
 }
 
@@ -64,6 +67,16 @@ export default function MemberForm({ member, mode = 'create' }) {
   const [cropImage, setCropImage] = useState(null)
   const fileInputRef = useRef(null)
 
+  const [spouseSearch, setSpouseSearch] = useState('')
+  const [spouseSuggestions, setSpouseSuggestions] = useState([])
+  const [spouseId, setSpouseId] = useState('')
+  const [spouseName, setSpouseName] = useState('')
+  const [showSpouseDropdown, setShowSpouseDropdown] = useState(false)
+  const spouseTimeoutRef = useRef(null)
+
+  const [confirmModal, setConfirmModal] = useState(null)
+  const [createdMemberId, setCreatedMemberId] = useState(null)
+
   function handleFileSelect(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -88,27 +101,136 @@ export default function MemberForm({ member, mode = 'create' }) {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
+  function clearSpouse() {
+    setSpouseSearch('')
+    setSpouseSuggestions([])
+    setSpouseId('')
+    setSpouseName('')
+    setShowSpouseDropdown(false)
+  }
+
+  function handleSpouseInput(e) {
+    const val = e.target.value
+    setSpouseSearch(val)
+    if (!val.trim()) {
+      setSpouseSuggestions([])
+      setShowSpouseDropdown(false)
+      return
+    }
+    if (spouseTimeoutRef.current) clearTimeout(spouseTimeoutRef.current)
+    spouseTimeoutRef.current = setTimeout(async () => {
+      const oppositeGender = form.gender === 'male' ? 'female' : form.gender === 'female' ? 'male' : ''
+      if (!oppositeGender) return
+      try {
+        const res = await fetch(`/api/members?gender=${oppositeGender}&search=${encodeURIComponent(val)}`)
+        if (res.ok) {
+          const data = await res.json()
+          const filtered = data.filter(m => mode !== 'edit' || m.id !== member.id)
+          setSpouseSuggestions(filtered)
+          setShowSpouseDropdown(filtered.length > 0)
+        }
+      } catch {}
+    }, 300)
+  }
+
+  function selectSpouse(m) {
+    setSpouseId(m.id)
+    setSpouseName(`${m.first_name} ${m.last_name}`)
+    setSpouseSearch(`${m.first_name} ${m.last_name}`)
+    setShowSpouseDropdown(false)
+  }
+
+  async function doCreateMember(payload) {
+    const url = '/api/members'
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to save member')
+    return data
+  }
+
+  async function doLinkSpouse(memberId, spouseMemberId, anniversary, memberName, spouseMemberName) {
+    await Promise.all([
+      fetch(`/api/members/${memberId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ relationship_status: 'married', wedding_anniversary: anniversary }),
+      }),
+      fetch(`/api/members/${spouseMemberId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ relationship_status: 'married', wedding_anniversary: anniversary }),
+      }),
+      fetch('/api/relationships', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_id: memberId, related_member_id: spouseMemberId, relationship_type: 'spouse' }),
+      }),
+    ])
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setSaving(true)
 
     const payload = { ...form }
+    delete payload.spouse_id
 
     try {
-      const url = mode === 'edit' ? `/api/members/${member.id}` : '/api/members'
-      const method = mode === 'edit' ? 'PUT' : 'POST'
+      if (mode === 'edit') {
+        const url = `/api/members/${member.id}`
+        const res = await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to save member')
+        router.push(`/members/${data.id}`)
+        router.refresh()
+      } else {
+        const data = await doCreateMember(payload)
+        if (spouseId) {
+          setCreatedMemberId(data.id)
+          setConfirmModal({
+            memberId: data.id,
+            spouseMemberId: spouseId,
+            memberName: `${payload.first_name} ${payload.last_name}`,
+            spouseName: spouseName,
+            anniversary: payload.wedding_anniversary,
+          })
+          setSaving(false)
+        } else {
+          router.push(`/members/${data.id}`)
+          router.refresh()
+        }
+      }
+    } catch (err) {
+      setError(err.message)
+      setSaving(false)
+    }
+  }
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to save member')
-
-      router.push(`/members/${data.id}`)
+  async function handleConfirmSpouse(answer) {
+    if (!confirmModal) return
+    setSaving(true)
+    try {
+      if (answer === 'yes') {
+        await doLinkSpouse(
+          confirmModal.memberId,
+          confirmModal.spouseMemberId,
+          confirmModal.anniversary,
+          confirmModal.memberName,
+          confirmModal.spouseName
+        )
+      }
+      setConfirmModal(null)
+      setCreatedMemberId(null)
+      router.push(`/members/${confirmModal.memberId}`)
       router.refresh()
     } catch (err) {
       setError(err.message)
@@ -186,7 +308,10 @@ export default function MemberForm({ member, mode = 'create' }) {
           <div className="form-group">
             <label className="form-label" htmlFor="relationship_status">Relationship Status</label>
             <select id="relationship_status" className="form-select" value={form.relationship_status}
-              onChange={e => set('relationship_status', e.target.value)}>
+              onChange={e => {
+                set('relationship_status', e.target.value)
+                if (e.target.value !== 'married') clearSpouse()
+              }}>
               <option value="">Select status</option>
               <option value="single">Single</option>
               <option value="married">Married</option>
@@ -195,6 +320,61 @@ export default function MemberForm({ member, mode = 'create' }) {
               <option value="divorced">Divorced</option>
             </select>
           </div>
+          {form.relationship_status === 'married' && (
+            <div className="form-group" style={{ position: 'relative' }}>
+              <label className="form-label" htmlFor="spouse_search">Spouse</label>
+              <input
+                id="spouse_search"
+                className="form-input"
+                placeholder="Spouse name…"
+                value={spouseSearch}
+                onChange={handleSpouseInput}
+                onFocus={() => spouseSuggestions.length > 0 && setShowSpouseDropdown(true)}
+                onBlur={() => setTimeout(() => setShowSpouseDropdown(false), 200)}
+              />
+              {spouseId && spouseName && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--green)', marginTop: '2px' }}>
+                  Selected: {spouseName}
+                </div>
+              )}
+              {showSpouseDropdown && spouseSuggestions.length > 0 && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                  background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)', maxHeight: '200px', overflowY: 'auto',
+                  boxShadow: 'var(--shadow)',
+                }}>
+                  {spouseSuggestions.map(m => {
+                    const initials = `${m.first_name?.[0] || ''}${m.last_name?.[0] || ''}`.toUpperCase()
+                    return (
+                      <div
+                        key={m.id}
+                        onMouseDown={() => selectSpouse(m)}
+                        style={{
+                          padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
+                          fontSize: '0.875rem', borderBottom: '1px solid var(--border)', transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <div style={{
+                          width: '32px', height: '32px', borderRadius: '50%',
+                          background: m.gender === 'male' ? 'var(--primary-light)' : 'var(--secondary-light)',
+                          color: m.gender === 'male' ? 'var(--primary)' : 'var(--secondary)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 700, fontSize: '0.75rem', flexShrink: 0,
+                        }}>{initials}</div>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{m.first_name} {m.last_name}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{m.gender}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           {form.relationship_status === 'married' && (
             <div className="form-group">
               <label className="form-label" htmlFor="wedding_anniversary">Wedding Anniversary</label>
@@ -285,11 +465,25 @@ export default function MemberForm({ member, mode = 'create' }) {
             <input id="email_address" type="email" className="form-input" value={form.email_address}
               onChange={e => set('email_address', e.target.value)} placeholder="member@example.com" />
           </div>
-          <div className="form-group form-group-full">
-            <label className="form-label" htmlFor="home_address">Home Address</label>
-            <textarea id="home_address" className="form-textarea" value={form.home_address}
-              onChange={e => set('home_address', e.target.value)}
-              placeholder="Street, Barangay, City, Province, ZIP" rows={2} />
+          <div className="form-group">
+            <label className="form-label" htmlFor="street_address">Street Address</label>
+            <input id="street_address" className="form-input" value={form.street_address}
+              onChange={e => set('street_address', e.target.value)} placeholder="House/Street/Purok" />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="village">Village</label>
+            <input id="village" className="form-input" value={form.village}
+              onChange={e => set('village', e.target.value)} placeholder="Village/Subdivision" />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="barangay">Barangay</label>
+            <input id="barangay" className="form-input" value={form.barangay}
+              onChange={e => set('barangay', e.target.value)} placeholder="Barangay" />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="city">City</label>
+            <input id="city" className="form-input" value={form.city}
+              onChange={e => set('city', e.target.value)} placeholder="City/Municipality" />
           </div>
         </div>
       </div>
@@ -347,6 +541,41 @@ export default function MemberForm({ member, mode = 'create' }) {
           onCrop={handleCropDone}
           onCancel={() => setCropImage(null)}
         />
+      )}
+
+      {confirmModal && (
+        <div className="modal-overlay" onClick={() => {}}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Link Spouse?</h2>
+              <button className="modal-close" onClick={() => {
+                setConfirmModal(null)
+                setCreatedMemberId(null)
+                if (createdMemberId) {
+                  setSaving(true)
+                  router.push(`/members/${createdMemberId}`)
+                  router.refresh()
+                }
+              }}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '16px' }}>
+                Would you like to update the anniversary date and family tree links for both{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>{confirmModal.memberName}</strong>
+                {' '}and{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>{confirmModal.spouseName}</strong>?
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => handleConfirmSpouse('no')}>
+                No, Save New Member Only
+              </button>
+              <button className="btn btn-primary" onClick={() => handleConfirmSpouse('yes')}>
+                Yes, Update Both
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </form>
   )

@@ -15,6 +15,7 @@ export default function MemberTable({ members, onDelete }) {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterGender, setFilterGender] = useState('')
+  const [filterAddressArea, setFilterAddressArea] = useState('')
   const [sortField, setSortField] = useState('last_name')
   const [sortDir, setSortDir] = useState('asc')
   const [page, setPage] = useState(1)
@@ -40,6 +41,13 @@ export default function MemberTable({ members, onDelete }) {
     if (filterStatus) list = list.filter(m => m.membership_status === filterStatus)
     if (filterType) list = list.filter(m => m.membership_type === filterType)
     if (filterGender) list = list.filter(m => m.gender === filterGender)
+    if (filterAddressArea) {
+      const q = filterAddressArea.toLowerCase()
+      list = list.filter(m => {
+        const area = [m.village, m.barangay].filter(Boolean).join(', ').toLowerCase()
+        return area.includes(q)
+      })
+    }
 
     list.sort((a, b) => {
       let aVal = a[sortField] || ''
@@ -54,7 +62,7 @@ export default function MemberTable({ members, onDelete }) {
       return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
     })
     return list
-  }, [members, search, filterStatus, filterType, filterGender, sortField, sortDir])
+  }, [members, search, filterStatus, filterType, filterGender, filterAddressArea, sortField, sortDir])
 
   const totalPages = Math.ceil(filtered.length / PER_PAGE)
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
@@ -104,9 +112,15 @@ export default function MemberTable({ members, onDelete }) {
           <option value="male">Male</option>
           <option value="female">Female</option>
         </select>
-        {(search || filterStatus || filterType || filterGender) && (
+        <input
+          className="form-input filter-select"
+          placeholder="Address area (village/barangay)"
+          value={filterAddressArea}
+          onChange={e => { setFilterAddressArea(e.target.value); setPage(1) }}
+        />
+        {(search || filterStatus || filterType || filterGender || filterAddressArea) && (
           <button className="btn btn-ghost btn-sm" onClick={() => {
-            setSearch(''); setFilterStatus(''); setFilterType(''); setFilterGender(''); setPage(1)
+            setSearch(''); setFilterStatus(''); setFilterType(''); setFilterGender(''); setFilterAddressArea(''); setPage(1)
           }}>Clear</button>
         )}
       </div>

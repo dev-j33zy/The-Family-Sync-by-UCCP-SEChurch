@@ -32,7 +32,10 @@ export async function POST(request) {
         membership_type: m.membership_type || null,
         phone_number: m.phone_number || null,
         email_address: m.email_address || null,
-        home_address: m.home_address || null,
+        street_address: m.street_address || null,
+        village: m.village || null,
+        barangay: m.barangay || null,
+        city: m.city || null,
       })))
       .select()
 

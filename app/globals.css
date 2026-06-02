@@ -512,6 +512,14 @@ img { max-width: 100%; display: block; }
   border: 1px solid rgba(107, 14, 30, 0.2);
 }
 
+.calendar-tooltip-desktop {
+  display: block;
+}
+
+.calendar-tooltip-mobile {
+  display: none;
+}
+
 .calendar-tooltip {
   position: absolute;
   bottom: calc(100% + 8px);
@@ -520,13 +528,13 @@ img { max-width: 100%; display: block; }
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  font-size: 0.75rem;
+  padding: 8px 14px;
+  font-size: 0.8rem;
   white-space: nowrap;
   z-index: 50;
   pointer-events: none;
   box-shadow: var(--shadow);
-  min-width: 140px;
+  min-width: 200px;
 }
 
 .calendar-legend {
@@ -913,6 +921,13 @@ img { max-width: 100%; display: block; }
   margin-bottom: 20px;
 }
 
+.filter-bar .form-input,
+.filter-bar .form-select {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 0.8rem;
+}
+
 /* Settings page */
 .settings-grid {
   display: grid;
@@ -976,8 +991,8 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
 
 .search-wrapper {
   position: relative;
-  flex: 0 0 40%;
-  min-width: 0;
+  flex: 1;
+  min-width: 140px;
 }
 
 .search-icon {
@@ -996,7 +1011,8 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
 }
 
 .filter-select {
-  min-width: 0;
+  flex: 1;
+  min-width: 140px;
 }
 
 /* =============================================
@@ -1439,6 +1455,11 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
 
 [data-theme="light"] .nav-item.active {
   background: var(--primary-light);
+  color: var(--primary);
+}
+
+[data-theme="light"] .sidebar-brand span {
+  color: var(--primary);
 }
 
 [data-theme="light"] .card {
@@ -1723,6 +1744,7 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
     gap: 24px;
   }
 
+  .import-controls,
   .export-controls {
     flex-direction: column;
     align-items: stretch;
@@ -2211,9 +2233,30 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
     height: 34px;
     font-size: 0.7rem;
   }
-  .calendar-tooltip {
+  .calendar-tooltip-desktop {
+    display: none !important;
+  }
+
+  .calendar-tooltip-mobile {
+    display: block;
+    margin-top: 12px;
+  }
+
+  .calendar-tooltip-mobile .calendar-tooltip {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    width: 100%;
+    max-width: calc(100vw - 40px);
+    min-width: 0;
+    margin: 0 auto;
     white-space: normal;
-    min-width: 120px;
+    font-size: 0.8rem;
+    padding: 10px 14px;
+    z-index: 10;
+    pointer-events: auto;
+    box-sizing: border-box;
   }
 
   /* Family tree mobile adjustments */
