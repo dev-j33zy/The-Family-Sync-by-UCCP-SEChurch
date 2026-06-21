@@ -88,7 +88,7 @@ export default function MemberTable({ members, onDelete }) {
           <input
             id="member-search"
             className="form-input search-input"
-            placeholder="Search by name or citizenship…"
+            placeholder="Search by name, ID, age, or citizenship…"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
           />
