@@ -138,12 +138,12 @@ export default function MemberTable({ members, onDelete }) {
             <thead>
               <tr>
                 <th onClick={() => handleSort('last_name')}>Name <SortIcon field="last_name" currentField={sortField} direction={sortDir} /></th>
-                <th onClick={() => handleSort('date_of_birth')}>Age <SortIcon field="date_of_birth" currentField={sortField} direction={sortDir} /></th>
-                <th onClick={() => handleSort('gender')}>Gender <SortIcon field="gender" currentField={sortField} direction={sortDir} /></th>
-                <th onClick={() => handleSort('citizenship')}>Citizenship <SortIcon field="citizenship" currentField={sortField} direction={sortDir} /></th>
-                <th onClick={() => handleSort('membership_status')}>Status <SortIcon field="membership_status" currentField={sortField} direction={sortDir} /></th>
-                <th onClick={() => handleSort('membership_type')}>Type <SortIcon field="membership_type" currentField={sortField} direction={sortDir} /></th>
-                <th onClick={() => handleSort('date_of_membership')}>Member Since <SortIcon field="date_of_membership" currentField={sortField} direction={sortDir} /></th>
+                <th className="mobile-hide" onClick={() => handleSort('date_of_birth')}>Age <SortIcon field="date_of_birth" currentField={sortField} direction={sortDir} /></th>
+                <th className="mobile-hide" onClick={() => handleSort('gender')}>Gender <SortIcon field="gender" currentField={sortField} direction={sortDir} /></th>
+                <th className="mobile-hide" onClick={() => handleSort('citizenship')}>Citizenship <SortIcon field="citizenship" currentField={sortField} direction={sortDir} /></th>
+                <th className="mobile-hide" onClick={() => handleSort('membership_status')}>Status <SortIcon field="membership_status" currentField={sortField} direction={sortDir} /></th>
+                <th className="mobile-hide" onClick={() => handleSort('membership_type')}>Type <SortIcon field="membership_type" currentField={sortField} direction={sortDir} /></th>
+                <th className="mobile-hide" onClick={() => handleSort('date_of_membership')}>Member Since <SortIcon field="date_of_membership" currentField={sortField} direction={sortDir} /></th>
                 <th style={{ width: '100px' }}>Actions</th>
               </tr>
             </thead>
@@ -178,26 +178,26 @@ export default function MemberTable({ members, onDelete }) {
                       </div>
                     </div>
                   </td>
-                  <td style={{ color: 'var(--text-primary)' }}>
+                  <td className="mobile-hide" style={{ color: 'var(--text-primary)' }}>
                     {calculateAge(member.date_of_birth) ?? '—'}
                   </td>
-                  <td style={{ color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                  <td className="mobile-hide" style={{ color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
                     {member.gender || '—'}
                   </td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{member.citizenship || '—'}</td>
-                  <td>
+                  <td className="mobile-hide" style={{ color: 'var(--text-secondary)' }}>{member.citizenship || '—'}</td>
+                  <td className="mobile-hide">
                     <span className={`badge badge-${member.membership_status}`}>
                       {capitalize(member.membership_status)}
                     </span>
                   </td>
-                  <td>
+                  <td className="mobile-hide">
                     {member.membership_type ? (
                       <span className={`badge badge-${member.membership_type}`}>
                         {capitalize(member.membership_type)}
                       </span>
                     ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                   </td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                  <td className="mobile-hide" style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
                     {member.date_of_membership ? formatDate(member.date_of_membership, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                   </td>
                   <td>

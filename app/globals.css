@@ -2154,6 +2154,10 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
     grid-template-columns: 1fr;
   }
 
+  /* Table: hide all columns except Name and Actions on mobile */
+  .table .mobile-hide { display: none; }
+  .table .table-member-name { min-width: 0; width: 100%; }
+
   .member-detail-header {
     flex-direction: column;
     text-align: center;
