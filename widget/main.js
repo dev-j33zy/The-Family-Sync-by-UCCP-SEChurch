@@ -82,7 +82,7 @@ function createWindow() {
     },
   }
 
-  if (!settings.x || !settings.y) {
+  if (settings.x === undefined || settings.y === undefined) {
     winSettings.x = display.width - settings.width - 20
     winSettings.y = display.height - settings.height - 60
   }
@@ -91,6 +91,20 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'))
 
   applyAutoStart(!!settings.autoStart)
+
+  // Debounced save position on drag end
+  let moveTimer = null
+  mainWindow.on('move', () => {
+    clearTimeout(moveTimer)
+    moveTimer = setTimeout(() => {
+      const bounds = mainWindow.getBounds()
+      saveSettings({
+        ...loadSettings(),
+        x: bounds.x,
+        y: bounds.y,
+      })
+    }, 400)
+  })
 
   mainWindow.on('close', () => {
     const bounds = mainWindow.getBounds()
@@ -112,11 +126,13 @@ ipcMain.handle('save-settings', (_, settings) => {
   saveSettings(merged)
 
   if (mainWindow) {
-    if (merged.width || merged.height) {
+    if (merged.width !== undefined || merged.height !== undefined) {
       const bounds = mainWindow.getBounds()
       mainWindow.setBounds({
-        width: merged.width || bounds.width,
-        height: merged.height || bounds.height,
+        width: merged.width !== undefined ? merged.width : bounds.width,
+        height: merged.height !== undefined ? merged.height : bounds.height,
+        x: merged.x !== undefined ? merged.x : bounds.x,
+        y: merged.y !== undefined ? merged.y : bounds.y,
       })
     }
     if (merged.autoStart !== undefined) {

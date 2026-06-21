@@ -503,6 +503,11 @@ body {
   font-size: calc(var(--font-size) * 0.79);
 }
 
+.settings-group select option {
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+
 /* Toggle switch */
 .toggle-label {
   display: flex;
