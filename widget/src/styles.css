@@ -463,13 +463,12 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: transparent;
-  padding: 14px;
+  background: var(--bg);
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  z-index: 20;
-  overflow-y: auto;
+  gap: 12px;
+  z-index: 30;
 }
 
 #settings-panel.hidden { display: none; }
@@ -501,11 +500,6 @@ body {
   background: var(--bg-secondary);
   color: var(--text);
   font-size: calc(var(--font-size) * 0.79);
-}
-
-.settings-group select option {
-  background: var(--bg-secondary);
-  color: var(--text);
 }
 
 /* Toggle switch */
@@ -555,6 +549,57 @@ body {
   letter-spacing: 0;
   opacity: 0.7;
 }
+
+/* Font picker (custom dropdown) */
+.font-picker {
+  position: relative;
+}
+
+.font-picker-input {
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: calc(var(--font-size) * 0.79);
+  cursor: pointer;
+}
+
+.font-picker-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  z-index: 40;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.font-option {
+  padding: 4px 8px;
+  font-size: calc(var(--font-size) * 0.79);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.font-option:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.font-option.selected {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.font-picker-options::-webkit-scrollbar { width: 4px; }
+.font-picker-options::-webkit-scrollbar-track { background: transparent; }
+.font-picker-options::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 .btn-primary {
   margin-top: auto;

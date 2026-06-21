@@ -542,9 +542,6 @@
     $('#s-font-size').addEventListener('input', () => {
       applySettings(collectSettingsFromUI())
     })
-    $('#s-font-family').addEventListener('input', () => {
-      applySettings(collectSettingsFromUI())
-    })
     $('#s-bg-color').addEventListener('input', () => {
       applySettings(collectSettingsFromUI())
     })
@@ -566,6 +563,25 @@
       const s = collectSettingsFromUI()
       applySettings(s)
       window.electronAPI.saveSettings(s)
+    })
+
+    // Font picker
+    const fontInput = $('#s-font-family')
+    const fontOptions = $('#s-font-options')
+    fontInput.addEventListener('click', (e) => {
+      e.stopPropagation()
+      fontOptions.classList.toggle('hidden')
+    })
+    fontOptions.querySelectorAll('.font-option').forEach(function (opt) {
+      opt.addEventListener('click', function (e) {
+        e.stopPropagation()
+        fontInput.value = this.dataset.value
+        fontOptions.classList.add('hidden')
+        applySettings(collectSettingsFromUI())
+      })
+    })
+    document.addEventListener('click', () => {
+      fontOptions.classList.add('hidden')
     })
     // Done: save everything and close
     $('#btn-settings-close').addEventListener('click', () => {

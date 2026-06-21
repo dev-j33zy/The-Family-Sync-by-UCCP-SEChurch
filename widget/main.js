@@ -126,13 +126,13 @@ ipcMain.handle('save-settings', (_, settings) => {
   saveSettings(merged)
 
   if (mainWindow) {
-    if (merged.width !== undefined || merged.height !== undefined) {
+    if ('width' in settings || 'height' in settings || 'x' in settings || 'y' in settings) {
       const bounds = mainWindow.getBounds()
       mainWindow.setBounds({
-        width: merged.width !== undefined ? merged.width : bounds.width,
-        height: merged.height !== undefined ? merged.height : bounds.height,
-        x: merged.x !== undefined ? merged.x : bounds.x,
-        y: merged.y !== undefined ? merged.y : bounds.y,
+        width: 'width' in settings ? settings.width : bounds.width,
+        height: 'height' in settings ? settings.height : bounds.height,
+        x: 'x' in settings ? settings.x : bounds.x,
+        y: 'y' in settings ? settings.y : bounds.y,
       })
     }
     if (merged.autoStart !== undefined) {
