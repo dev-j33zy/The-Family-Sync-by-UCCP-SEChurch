@@ -8,22 +8,16 @@
 </head>
 <body>
   <div id="app" class="theme-dark">
-    <!-- Title Bar (hidden by default, shows on hover) -->
+    <!-- Title Bar -->
     <div id="titlebar">
       <div id="titlebar-drag">
         <span id="title-icon">&#9783;</span>
         <span id="title-text">Family Sync</span>
       </div>
       <div id="titlebar-actions">
-        <div id="menu-dots" class="dropdown">
-          <button id="btn-dots" class="tb-btn" title="Menu">&ctdot;</button>
-          <div id="dropdown-menu" class="dropdown-content hidden">
-            <button id="dropdown-settings">&#9881; Settings</button>
-            <button id="dropdown-refresh">&#8635; Refresh</button>
-            <hr>
-            <button id="dropdown-close">&#10005; Close</button>
-          </div>
-        </div>
+        <button id="btn-settings" class="tb-btn" title="Settings">&#9881;</button>
+        <button id="btn-refresh" class="tb-btn" title="Refresh">&#8635;</button>
+        <button id="btn-close" class="tb-btn tb-close" title="Close">&times;</button>
       </div>
     </div>
 
@@ -35,92 +29,66 @@
 
     <!-- Content Area -->
     <div id="content">
+      <!-- List View -->
       <div id="view-list" class="view active">
         <div id="events-list"></div>
       </div>
 
+      <!-- Calendar View -->
       <div id="view-calendar" class="view">
-        <div id="calendar-legend">
-          <span class="legend-item">
-            <svg class="legend-svg legend-birthday" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="0.8">
-              <path d="M3 7h10v7a1 1 0 01-1 1H4a1 1 0 01-1-1V7z"/>
-              <rect x="4" y="4" width="2" height="3" rx="0.5"/>
-              <rect x="7" y="3" width="2" height="4" rx="0.5"/>
-              <rect x="10" y="4" width="2" height="3" rx="0.5"/>
-              <rect x="2" y="7" width="12" height="1.5" rx="0.5"/>
-            </svg>
-            Birthday
-          </span>
-          <span class="legend-item">
-            <svg class="legend-svg legend-anniversary" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="0.8">
-              <path d="M8 14C2 9 0 6 0 4.5 0 2 2 0 4.5 0 6 0 7.5 1 8 2 8.5 1 10 0 11.5 0 14 0 16 2 16 4.5 16 6 14 9 8 14z"/>
-            </svg>
-            Anniversary
-          </span>
-        </div>
         <div id="calendar-header">
           <button id="cal-prev" class="cal-nav">&#8249;</button>
           <span id="cal-label"></span>
           <button id="cal-next" class="cal-nav">&#8250;</button>
         </div>
         <div id="calendar-grid"></div>
-        <div id="calendar-tooltip-area" class="hidden"></div>
+        <div id="calendar-legend">
+          <span class="legend-item"><span class="legend-dot dot-birthday"></span> Birthday</span>
+          <span class="legend-item"><span class="legend-dot dot-anniversary"></span> Anniversary</span>
+        </div>
       </div>
+    </div>
 
-      <!-- Settings Panel (inside content so it sits below title bar/tabs) -->
-      <div id="settings-panel" class="hidden">
-        <div class="settings-group">
-          <label>Font Size</label>
-          <input type="range" id="s-font-size" min="10" max="24" step="1">
-        </div>
-        <div class="settings-group">
-          <label>Font Family</label>
-          <select id="s-font-family">
-            <option value="Segoe UI, sans-serif">Segoe UI</option>
-            <option value="Consolas, monospace">Consolas</option>
-            <option value="Georgia, serif">Georgia</option>
-            <option value="'Comic Sans MS', cursive">Comic Sans</option>
-          </select>
-        </div>
-        <div class="settings-group">
-          <label>Background Color</label>
-          <input type="color" id="s-bg-color">
-        </div>
-        <div class="settings-group">
-          <label>Background Opacity</label>
-          <input type="range" id="s-bg-opacity" min="0.2" max="1" step="0.01">
-        </div>
-        <div class="settings-group">
-          <label>Text Opacity</label>
-          <input type="range" id="s-text-opacity" min="0.3" max="1" step="0.01">
-        </div>
-        <div class="settings-group">
-          <label>Theme</label>
-          <select id="s-theme">
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
-            <option value="yellow">Yellow Note</option>
-            <option value="pink">Pink Note</option>
-          </select>
-        </div>
-        <div class="settings-group">
-          <label>Start on Windows Login</label>
-          <label class="toggle-label">
-            <input type="checkbox" id="s-auto-start">
-            <span class="toggle-slider"></span>
-            <span id="s-auto-start-label">Off</span>
-          </label>
-        </div>
-        <div class="settings-group">
-          <label>Always on Top</label>
-          <label class="toggle-label">
-            <input type="checkbox" id="s-always-on-top">
-            <span class="toggle-slider"></span>
-            <span id="s-always-on-top-label">On</span>
-          </label>
-        </div>
-        <button id="btn-settings-close" class="btn-primary">Done</button>
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="hidden">
+      <div class="settings-group">
+        <label>Font Size</label>
+        <input type="range" id="s-font-size" min="10" max="24" step="1">
       </div>
+      <div class="settings-group">
+        <label>Font Family</label>
+        <select id="s-font-family">
+          <option value="Segoe UI, sans-serif">Segoe UI</option>
+          <option value="system-ui, sans-serif">System UI</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="Consolas, monospace">Consolas</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Comic Sans MS', cursive">Comic Sans</option>
+          <option value="Tahoma, sans-serif">Tahoma</option>
+          <option value="Verdana, sans-serif">Verdana</option>
+          <option value="'Courier New', monospace">Courier New</option>
+          <option value="'Times New Roman', serif">Times New Roman</option>
+          <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+        </select>
+      </div>
+      <div class="settings-group">
+        <label>Background Color</label>
+        <input type="color" id="s-bg-color">
+      </div>
+      <div class="settings-group">
+        <label>Opacity</label>
+        <input type="range" id="s-opacity" min="0.3" max="1" step="0.01">
+      </div>
+      <div class="settings-group">
+        <label>Theme</label>
+        <select id="s-theme">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+          <option value="yellow">Yellow Note</option>
+          <option value="pink">Pink Note</option>
+        </select>
+      </div>
+      <button id="btn-settings-close" class="btn-primary">Done</button>
     </div>
 
     <!-- Resize Handle -->
