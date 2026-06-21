@@ -25,8 +25,6 @@ export default function CreateUserPage() {
   const [message, setMessage] = useState(null)
   const [error, setError] = useState(null)
   const [createdUser, setCreatedUser] = useState(null)
-  const [inviteLink, setInviteLink] = useState(null)
-  const [inviteCopied, setInviteCopied] = useState(false)
 
   const [resetEmail, setResetEmail] = useState('')
   const [resetting, setResetting] = useState(false)
@@ -78,7 +76,6 @@ export default function CreateUserPage() {
 
       setMessage(data.message)
       setCreatedUser(data.user)
-      setInviteLink(data.link)
       setFirstName('')
       setLastName('')
       setEmail('')
@@ -88,14 +85,10 @@ export default function CreateUserPage() {
     setSubmitting(false)
   }
 
-  const [resetLink, setResetLink] = useState(null)
-  const [copied, setCopied] = useState(false)
-
   async function handleResetPassword(e) {
     e.preventDefault()
     setResetError(null)
     setResetSent(false)
-    setResetLink(null)
 
     if (!resetEmail) {
       setResetError('Please enter an email address')
@@ -115,27 +108,10 @@ export default function CreateUserPage() {
       if (!res.ok) throw new Error(data.error)
 
       setResetSent(true)
-      setResetLink(data.link)
     } catch (err) {
       setResetError(err.message)
     }
     setResetting(false)
-  }
-
-  async function copyLink() {
-    if (resetLink) {
-      await navigator.clipboard.writeText(resetLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
-  async function copyInviteLink() {
-    if (inviteLink) {
-      await navigator.clipboard.writeText(inviteLink)
-      setInviteCopied(true)
-      setTimeout(() => setInviteCopied(false), 2000)
-    }
   }
 
   async function handleDeleteUser(e) {

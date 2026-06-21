@@ -27,6 +27,8 @@ export default function AuthCallbackPage() {
     const type = search.get('type')
     if (type === 'recovery') return 'recovery'
     if (type === 'signup') return 'signup'
+    if (type === 'email_change') return 'email_change'
+    if (type === 'reauthentication') return 'reauthentication'
     return 'invite'
   })
   
@@ -57,11 +59,14 @@ export default function AuthCallbackPage() {
     const tokenHash = search.get('token_hash')
     const accessToken = hash.get('access_token')
 
-    // Direct link with token_hash (from admin.generateLink)
+    // Direct link with token_hash (from email template)
     if (tokenHash) {
-      const otpType = (type === 'recovery' || type === 'signup' || type === 'invite') ? type : 'invite'
+      const VALID_TYPES = ['recovery', 'signup', 'invite', 'email_change', 'reauthentication']
+      const otpType = VALID_TYPES.includes(type) ? type : 'invite'
       supabase.auth.verifyOtp({ type: otpType, token_hash: tokenHash }).then(({ error: err }) => {
-        if (err) { setError(err.message); setStep('error') }
+        if (err) { setError(err.message); setStep('error'); return }
+        if (otpType === 'email_change') setStep('email-changed')
+        else if (otpType === 'reauthentication') { router.push('/'); router.refresh() }
         else setStep('set-password')
       })
       return
@@ -73,19 +78,19 @@ export default function AuthCallbackPage() {
       return
     }
 
-    // PKCE flow with code
+    // PKCE flow with code (legacy — prefer token_hash)
     if (code) {
       supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
         if (err) {
-          // Detect the specific PKCE error that happens with Invite links
           if (err.message.includes('code verifier') || err.message.includes('grant')) {
-            setError('Security mismatch (PKCE). The admin generated this invite, but you are opening it. Please ask the admin to update their Supabase Email Template to use token_hash as instructed.')
+            setError('Security mismatch (PKCE). Please ask your admin to update the Supabase Email Templates to use token_hash.')
           } else {
             setError(err.message)
           }
           setStep('error')
         } else {
-          setStep('set-password')
+          if (type === 'email_change') setStep('email-changed')
+          else setStep('set-password')
         }
       })
       return
@@ -187,6 +192,15 @@ export default function AuthCallbackPage() {
                 {loading ? 'Setting password…' : 'Set Password & Sign In'}
               </button>
             </form>
+          </>
+        )}
+
+        {step === 'email-changed' && (
+          <>
+            <p className="login-subtitle">Your email address has been updated.</p>
+            <p style={{ textAlign: 'center', marginTop: '16px' }}>
+              <a href="/login" style={{ color: 'var(--primary)' }}>Back to Sign In</a>
+            </p>
           </>
         )}
 
