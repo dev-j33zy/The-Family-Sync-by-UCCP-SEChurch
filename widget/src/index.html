@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Sync Widget</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" class="theme-dark">
+    <!-- Title Bar -->
+    <div id="titlebar">
+      <div id="titlebar-drag">
+        <span id="title-icon">&#9783;</span>
+        <span id="title-text">Family Sync</span>
+      </div>
+      <div id="titlebar-actions">
+        <button id="btn-settings" class="tb-btn" title="Settings">&#9881;</button>
+        <button id="btn-refresh" class="tb-btn" title="Refresh">&#8635;</button>
+        <button id="btn-close" class="tb-btn tb-close" title="Close">&times;</button>
+      </div>
+    </div>
+
+    <!-- View Tabs -->
+    <div id="view-tabs">
+      <button id="tab-list" class="tab active" data-view="list">Upcoming</button>
+      <button id="tab-calendar" class="tab" data-view="calendar">Calendar</button>
+    </div>
+
+    <!-- Content Area -->
+    <div id="content">
+      <!-- List View -->
+      <div id="view-list" class="view active">
+        <div id="events-list"></div>
+      </div>
+
+      <!-- Calendar View -->
+      <div id="view-calendar" class="view">
+        <div id="calendar-header">
+          <button id="cal-prev" class="cal-nav">&#8249;</button>
+          <span id="cal-label"></span>
+          <button id="cal-next" class="cal-nav">&#8250;</button>
+        </div>
+        <div id="calendar-grid"></div>
+        <div id="calendar-legend">
+          <span class="legend-item"><span class="legend-dot dot-birthday"></span> Birthday</span>
+          <span class="legend-item"><span class="legend-dot dot-anniversary"></span> Anniversary</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="hidden">
+      <div class="settings-group">
+        <label>Font Size</label>
+        <input type="range" id="s-font-size" min="10" max="24" step="1">
+      </div>
+      <div class="settings-group">
+        <label>Font Family</label>
+        <select id="s-font-family">
+          <option value="Segoe UI, sans-serif">Segoe UI</option>
+          <option value="Consolas, monospace">Consolas</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Comic Sans MS', cursive">Comic Sans</option>
+        </select>
+      </div>
+      <div class="settings-group">
+        <label>Background Color</label>
+        <input type="color" id="s-bg-color">
+      </div>
+      <div class="settings-group">
+        <label>Opacity</label>
+        <input type="range" id="s-opacity" min="0.3" max="1" step="0.01">
+      </div>
+      <div class="settings-group">
+        <label>Theme</label>
+        <select id="s-theme">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+          <option value="yellow">Yellow Note</option>
+          <option value="pink">Pink Note</option>
+        </select>
+      </div>
+      <button id="btn-settings-close" class="btn-primary">Done</button>
+    </div>
+
+    <!-- Resize Handle -->
+    <div id="resize-handle"></div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

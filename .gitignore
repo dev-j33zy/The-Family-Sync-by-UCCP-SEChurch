@@ -36,6 +36,10 @@ yarn-error.log*
 .env.test
 .env.production
 
+# widget
+/widget/node_modules
+/widget/.env
+
 # allow example env file
 !.env.example
 !.env.local.example

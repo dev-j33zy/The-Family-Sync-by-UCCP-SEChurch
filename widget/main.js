@@ -1,0 +1,125 @@
+const { app, BrowserWindow, ipcMain, screen } = require('electron')
+const path = require('path')
+const fs = require('fs')
+
+// Load .env manually
+const envPath = path.join(__dirname, '.env')
+if (fs.existsSync(envPath)) {
+  const lines = fs.readFileSync(envPath, 'utf8').split('\n')
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eq = trimmed.indexOf('=')
+    if (eq === -1) continue
+    const key = trimmed.slice(0, eq).trim()
+    const val = trimmed.slice(eq + 1).trim()
+    process.env[key] = val
+  }
+}
+
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'widget-settings.json')
+
+function loadSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_PATH)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'))
+    }
+  } catch {}
+  return getDefaultSettings()
+}
+
+function saveSettings(settings) {
+  try {
+    fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2))
+  } catch {}
+}
+
+function getDefaultSettings() {
+  return {
+    width: 340,
+    height: 480,
+    x: undefined,
+    y: undefined,
+    fontSize: 14,
+    fontFamily: 'Segoe UI, sans-serif',
+    bgColor: '#2d2d2d',
+    opacity: 0.92,
+    theme: 'dark',
+    view: 'list',
+  }
+}
+
+let mainWindow = null
+
+function createWindow() {
+  const settings = loadSettings()
+  const display = screen.getPrimaryDisplay().workAreaSize
+
+  const winSettings = {
+    width: Math.min(settings.width, display.width),
+    height: Math.min(settings.height, display.height),
+    x: settings.x,
+    y: settings.y,
+    frame: false,
+    alwaysOnTop: true,
+    transparent: true,
+    resizable: true,
+    skipTaskbar: false,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  }
+
+  if (!settings.x || !settings.y) {
+    winSettings.x = display.width - settings.width - 20
+    winSettings.y = display.height - settings.height - 60
+  }
+
+  mainWindow = new BrowserWindow(winSettings)
+  mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'))
+  mainWindow.setOpacity(settings.opacity)
+
+  mainWindow.on('close', () => {
+    const bounds = mainWindow.getBounds()
+    saveSettings({
+      ...loadSettings(),
+      width: bounds.width,
+      height: bounds.height,
+      x: bounds.x,
+      y: bounds.y,
+    })
+  })
+}
+
+ipcMain.handle('get-settings', () => loadSettings())
+
+ipcMain.handle('save-settings', (_, settings) => {
+  const current = loadSettings()
+  const merged = { ...current, ...settings }
+  saveSettings(merged)
+
+  if (mainWindow) {
+    if (merged.opacity !== undefined) mainWindow.setOpacity(merged.opacity)
+    if (merged.width || merged.height) {
+      const bounds = mainWindow.getBounds()
+      mainWindow.setBounds({
+        width: merged.width || bounds.width,
+        height: merged.height || bounds.height,
+      })
+    }
+    mainWindow.webContents.send('settings-updated', merged)
+  }
+  return merged
+})
+
+ipcMain.handle('get-env', () => ({
+  url: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+}))
+
+app.whenReady().then(createWindow)
+
+app.on('window-all-closed', () => app.quit())
