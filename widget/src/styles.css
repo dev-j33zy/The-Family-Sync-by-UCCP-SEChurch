@@ -11,7 +11,11 @@ body {
   user-select: none;
 }
 
+/* =============================================
+   ROOT APP
+   ============================================= */
 #app {
+  --font-size: 14px;
   position: relative;
   width: 100vw;
   height: 100vh;
@@ -22,74 +26,73 @@ body {
   background: var(--bg);
   color: var(--text);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  font-size: var(--font-size);
 }
 
 /* =============================================
-   THEMES
+   THEMES (base values — renderer overrides text)
    ============================================= */
 #app.theme-dark {
-  --bg: #2d2d2d;
   --bg-secondary: #3a3a3a;
-  --text: #e0e0e0;
-  --text-muted: #999;
   --border: #444;
   --accent: #6b0e1e;
   --accent-text: #fff;
   --birthday: #3B82F6;
   --anniversary: #EF4444;
-  --titlebar-bg: #222;
+  --titlebar-bg: rgba(0,0,0,0.25);
 }
 
 #app.theme-light {
-  --bg: #f0f0f0;
-  --bg-secondary: #e4e4e4;
-  --text: #333;
-  --text-muted: #888;
-  --border: #ccc;
+  --bg-secondary: rgba(0,0,0,0.06);
+  --border: rgba(0,0,0,0.15);
   --accent: #6b0e1e;
   --accent-text: #fff;
   --birthday: #3B82F6;
   --anniversary: #EF4444;
-  --titlebar-bg: #ddd;
+  --titlebar-bg: rgba(0,0,0,0.08);
 }
 
 #app.theme-yellow {
-  --bg: #fff9c4;
-  --bg-secondary: #fff59d;
-  --text: #5d4037;
-  --text-muted: #8d6e63;
-  --border: #e0c070;
+  --bg-secondary: rgba(0,0,0,0.06);
+  --border: rgba(0,0,0,0.12);
   --accent: #f57f17;
   --accent-text: #fff;
   --birthday: #1565C0;
   --anniversary: #C62828;
-  --titlebar-bg: #fdd835;
+  --titlebar-bg: rgba(0,0,0,0.10);
 }
 
 #app.theme-pink {
-  --bg: #fce4ec;
-  --bg-secondary: #f8bbd0;
-  --text: #4a1a2c;
-  --text-muted: #7b4b5c;
-  --border: #e0a0b4;
+  --bg-secondary: rgba(0,0,0,0.05);
+  --border: rgba(0,0,0,0.10);
   --accent: #e91e63;
   --accent-text: #fff;
   --birthday: #1565C0;
   --anniversary: #C62828;
-  --titlebar-bg: #f48fb1;
+  --titlebar-bg: rgba(0,0,0,0.08);
 }
 
 /* =============================================
-   TITLE BAR
+   TITLE BAR — hidden by default, shown on hover
    ============================================= */
 #titlebar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: var(--titlebar-bg);
-  padding: 4px 6px;
+  padding: 3px 6px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+#app:hover #titlebar,
+#titlebar:hover,
+#dropdown-menu:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 #titlebar-drag {
@@ -102,42 +105,75 @@ body {
 }
 
 #title-icon {
-  font-size: 16px;
+  font-size: 15px;
   color: var(--accent);
 }
 
 #title-text {
-  font-size: 12px;
+  font-size: calc(var(--font-size) * 0.79);
   font-weight: 600;
   color: var(--text);
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 #titlebar-actions {
-  display: flex;
-  gap: 2px;
   -webkit-app-region: no-drag;
+  position: relative;
 }
 
-.tb-btn {
+/* =============================================
+   3-DOT DROPDOWN MENU
+   ============================================= */
+#btn-dots {
   background: none;
   border: none;
-  color: var(--text-muted);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  line-height: 1;
-}
-
-.tb-btn:hover {
-  background: var(--bg-secondary);
   color: var(--text);
+  font-size: calc(var(--font-size) * 1.29);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  letter-spacing: 2px;
+  opacity: 0.6;
 }
 
-.tb-close:hover {
-  background: #e81123;
-  color: #fff;
+#btn-dots:hover { opacity: 1; }
+
+.dropdown-content {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--bg-secondary);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 150px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  z-index: 30;
+  overflow: hidden;
+}
+
+.dropdown-content.hidden { display: none; }
+
+.dropdown-content button {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-size: calc(var(--font-size) * 0.86);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdown-content button:hover {
+  background: var(--border);
+}
+
+.dropdown-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
 }
 
 /* =============================================
@@ -151,70 +187,68 @@ body {
 
 .tab {
   flex: 1;
-  padding: 6px;
+  padding: 5px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--text-muted);
-  font-size: 11px;
+  color: var(--text);
+  opacity: 0.4;
+  font-size: calc(var(--font-size) * 0.71);
   font-weight: 600;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-.tab:hover { color: var(--text); }
+.tab:hover { opacity: 0.7; }
 .tab.active {
-  color: var(--text);
+  opacity: 1;
   border-bottom-color: var(--accent);
 }
 
 /* =============================================
-   CONTENT
+   CONTENT — text selectable like notepad
    ============================================= */
 #content {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 12px;
+  padding: 6px 8px;
   position: relative;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
-.view {
-  display: none;
-}
-
-.view.active {
-  display: block;
-}
+.view { display: none; }
+.view.active { display: block; }
 
 /* =============================================
-   LIST VIEW (Upcoming Events)
+   LIST VIEW
    ============================================= */
 #events-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .event-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
 }
 
 .event-icon {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .event-icon.birthday {
@@ -234,24 +268,24 @@ body {
 
 .event-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(var(--font-size) * 0.86);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .event-detail {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: calc(var(--font-size) * 0.71);
+  opacity: 0.6;
   margin-top: 1px;
 }
 
 .event-days {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: calc(var(--font-size) * 0.71);
   font-weight: 700;
   text-align: right;
-  min-width: 40px;
+  min-width: 36px;
 }
 
 .event-days.today { color: var(--birthday); }
@@ -262,16 +296,15 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 36px 16px;
   text-align: center;
-  color: var(--text-muted);
-  font-size: 13px;
+  opacity: 0.5;
+  font-size: calc(var(--font-size) * 0.86);
 }
 
 .empty-state-icon {
-  font-size: 32px;
-  margin-bottom: 8px;
-  opacity: 0.4;
+  font-size: calc(var(--font-size) * 2);
+  margin-bottom: 2px;
 }
 
 /* =============================================
@@ -281,24 +314,25 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .cal-nav {
   background: none;
   border: 1px solid var(--border);
   color: var(--text);
-  font-size: 16px;
+  font-size: calc(var(--font-size) * 1);
   cursor: pointer;
-  padding: 2px 10px;
+  padding: 1px 8px;
   border-radius: 4px;
+  opacity: 0.7;
 }
 
-.cal-nav:hover { background: var(--bg-secondary); }
+.cal-nav:hover { opacity: 1; background: var(--bg-secondary); }
 
 #cal-label {
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(var(--font-size) * 0.79);
 }
 
 #calendar-grid {
@@ -306,93 +340,122 @@ body {
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
   text-align: center;
+  min-height: 160px;
 }
 
 .cal-day-header {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-  padding: 4px 0;
+  font-size: calc(var(--font-size) * 0.6);
+  font-weight: 600;
+  opacity: 0.4;
+  padding: 3px 0;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .cal-day {
   position: relative;
-  padding: 4px 0;
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  font-size: calc(var(--font-size) * 0.75);
   border-radius: 4px;
-  cursor: default;
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
-.cal-day.empty { visibility: hidden; }
-.cal-day.today { font-weight: 700; }
+.cal-day:hover { background: var(--bg-secondary); }
 
-.cal-day.has-event .cal-day-num {
+.cal-day.empty { visibility: hidden; pointer-events: none; }
+
+.cal-day.today {
+  font-weight: 700;
+  background: rgba(107, 14, 30, 0.12);
+  border: 1px solid rgba(107, 14, 30, 0.2);
+}
+
+.cal-day-num {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
   border-radius: 50%;
+  font-size: calc(var(--font-size) * 0.71);
 }
 
-.cal-day.has-event.both .cal-day-num {
+.cal-day.has-both .cal-day-num {
   border: 2px solid transparent;
   background: linear-gradient(var(--bg), var(--bg)) padding-box,
               linear-gradient(135deg, var(--birthday), var(--anniversary)) border-box;
 }
 
-.cal-day.has-event.birthday .cal-day-num {
+.cal-day.has-birthday .cal-day-num {
   border: 2px solid var(--birthday);
 }
 
-.cal-day.has-event.anniversary .cal-day-num {
+.cal-day.has-anniversary .cal-day-num {
   border: 2px solid var(--anniversary);
 }
 
-.cal-tooltip {
-  display: none;
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
+/* Tooltip area below grid */
+#calendar-tooltip-area {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-radius: 6px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 10px;
-  white-space: nowrap;
-  font-size: 11px;
-  z-index: 10;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  pointer-events: none;
+  font-size: calc(var(--font-size) * 0.71);
+  line-height: 1.6;
 }
 
-.cal-day:hover .cal-tooltip {
-  display: block;
+#calendar-tooltip-area.hidden { display: none; }
+
+#calendar-tooltip-area .tt-event {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
+#calendar-tooltip-area .tt-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  width: 18px;
+  height: 18px;
+}
+
+#calendar-tooltip-area .tt-icon.birthday { color: var(--birthday); }
+#calendar-tooltip-area .tt-icon.anniversary { color: var(--anniversary); }
+
+/* Legend */
 #calendar-legend {
   display: flex;
   justify-content: center;
   gap: 16px;
-  margin-top: 10px;
-  font-size: 10px;
-  color: var(--text-muted);
+  margin: 16px 0 14px 0;
+  font-size: calc(var(--font-size) * 0.75);
+  opacity: 0.85;
 }
 
-.legend-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 4px;
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.legend-dot.dot-birthday { background: var(--birthday); }
-.legend-dot.dot-anniversary { background: var(--anniversary); }
+.legend-svg {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.legend-birthday { color: var(--birthday); }
+.legend-anniversary { color: var(--anniversary); }
 
 /* =============================================
-   SETTINGS PANEL
+   SETTINGS PANEL (inside #content)
    ============================================= */
 #settings-panel {
   position: absolute;
@@ -400,30 +463,29 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--bg);
-  padding: 16px;
+  background: transparent;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   z-index: 20;
+  overflow-y: auto;
 }
 
-#settings-panel.hidden {
-  display: none;
-}
+#settings-panel.hidden { display: none; }
 
 .settings-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .settings-group label {
-  font-size: 11px;
+  font-size: calc(var(--font-size) * 0.71);
   font-weight: 600;
-  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  opacity: 0.6;
 }
 
 .settings-group input[type="range"] {
@@ -433,22 +495,70 @@ body {
 
 .settings-group select,
 .settings-group input[type="color"] {
-  padding: 4px 8px;
+  padding: 3px 6px;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-secondary);
   color: var(--text);
-  font-size: 12px;
+  font-size: calc(var(--font-size) * 0.79);
+}
+
+/* Toggle switch */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.2s;
+}
+
+.toggle-label input:checked + .toggle-slider {
+  background: var(--accent);
+}
+
+.toggle-label input:checked + .toggle-slider::after {
+  transform: translateX(16px);
+}
+
+#s-auto-start-label {
+  font-size: calc(var(--font-size) * 0.79);
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.7;
 }
 
 .btn-primary {
   margin-top: auto;
-  padding: 8px;
+  padding: 7px;
   border: none;
   border-radius: 6px;
   background: var(--accent);
   color: var(--accent-text);
-  font-size: 12px;
+  font-size: calc(var(--font-size) * 0.86);
   font-weight: 600;
   cursor: pointer;
 }
@@ -473,16 +583,16 @@ body {
   position: absolute;
   bottom: 3px;
   right: 3px;
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid var(--text-muted);
-  border-bottom: 2px solid var(--text-muted);
-  opacity: 0.3;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--text);
+  border-bottom: 1.5px solid var(--text);
+  opacity: 0.2;
 }
 
 /* =============================================
    SCROLLBAR
    ============================================= */
-#content::-webkit-scrollbar { width: 4px; }
+#content::-webkit-scrollbar { width: 3px; }
 #content::-webkit-scrollbar-track { background: transparent; }
 #content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
