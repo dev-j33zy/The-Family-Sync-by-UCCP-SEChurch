@@ -551,11 +551,6 @@ body {
   opacity: 0.7;
 }
 
-.settings-group select option {
-  background: var(--bg-secondary);
-  color: var(--text);
-}
-
 .btn-primary {
   margin-top: auto;
   padding: 7px;

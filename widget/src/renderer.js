@@ -1,360 +1,600 @@
-// =============================================
-// STATE
-// =============================================
-let members = []
-let settings = {}
-let supabaseUrl = ''
-let supabaseKey = ''
-let viewYear = new Date().getFullYear()
-let viewMonth = new Date().getMonth()
-let refreshInterval = null
+(function () {
+  'use strict'
 
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
-const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+  let settings = {}
+  let events = []
+  let calMonth = new Date().getMonth()
+  let calYear = new Date().getFullYear()
 
-// =============================================
-// INIT
-// =============================================
-async function init() {
-  const env = await window.electronAPI.getEnv()
-  supabaseUrl = env.url
-  supabaseKey = env.key
+  const $ = (sel) => document.querySelector(sel)
+  const $$ = (sel) => document.querySelectorAll(sel)
 
-  settings = await window.electronAPI.getSettings()
-  applySettings(settings)
-
-  setupTitleBar()
-  setupTabs()
-  setupCalendarNav()
-  setupSettingsUI()
-  setupResize()
-
-  await fetchMembers()
-  renderListView()
-  renderCalendarView()
-
-  // Auto-refresh every 30 minutes
-  refreshInterval = setInterval(fetchMembers, 30 * 60 * 1000)
-
-  window.electronAPI.onSettingsUpdated((s) => {
-    settings = s
-    applySettings(s)
-  })
-}
-
-// =============================================
-// SUPABASE FETCH
-// =============================================
-async function fetchMembers() {
-  const btn = document.getElementById('btn-refresh')
-  btn.style.transform = 'rotate(360deg)'
-  btn.style.transition = 'transform 0.3s'
-
-  try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/members?select=id,first_name,last_name,date_of_birth,wedding_anniversary,relationship_status,spouse_name`, {
-      headers: {
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-      },
+  /* =============================================
+     TEXT COLOR ADAPTATION
+     ============================================= */
+  function getLuminance(hex) {
+    const rgb = hexToRgb(hex)
+    if (!rgb) return 0.5
+    const [r, g, b] = rgb.map(c => {
+      c /= 255
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    members = await res.json()
-  } catch (err) {
-    console.error('Fetch failed:', err)
-    document.getElementById('events-list').innerHTML =
-      `<div class="empty-state"><div class="empty-state-icon">&#9888;</div><div>Failed to load data.<br>Check .env or connection.</div></div>`
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
   }
 
-  setTimeout(() => { btn.style.transform = '' }, 300)
-  renderListView()
-  renderCalendarView()
-}
+  function hexToRgb(hex) {
+    const m = hex.replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i)
+    if (!m) return null
+    return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)]
+  }
 
-// =============================================
-// EVENT CALCULATIONS (mirrors lib/utils.js)
-// =============================================
-function calculateAge(dateStr) {
-  if (!dateStr) return null
-  const today = new Date()
-  const birth = new Date(dateStr + 'T00:00:00')
-  let age = today.getFullYear() - birth.getFullYear()
-  const m = today.getMonth() - birth.getMonth()
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
-  return age
-}
+  function rgbToStr(r, g, b, a) {
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')'
+  }
 
-function getUpcomingEvents(daysAhead = 7) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const events = []
+  function autoTextColor(bgHex) {
+    return getLuminance(bgHex) > 0.5 ? '#1a1a1a' : '#e0e0e0'
+  }
 
-  for (const m of members) {
-    const fullName = `${m.first_name} ${m.last_name}`
+  /* =============================================
+     APPLY SETTINGS
+     ============================================= */
+  function applySettings(s) {
+    settings = s
 
-    if (m.date_of_birth) {
-      const dob = new Date(m.date_of_birth + 'T00:00:00')
-      const thisYear = new Date(today.getFullYear(), dob.getMonth(), dob.getDate())
-      if (thisYear < today) thisYear.setFullYear(today.getFullYear() + 1)
-      const diff = Math.round((thisYear - today) / (1000 * 60 * 60 * 24))
-      if (diff <= daysAhead) {
-        events.push({
+    const app = $('#app')
+
+    // Theme class
+    app.className = 'theme-' + (s.theme || 'dark')
+
+    // Background color & opacity
+    const bg = s.bgColor || '#2d2d2d'
+    const bgRgb = hexToRgb(bg)
+    const bgOp = s.bgOpacity !== undefined ? s.bgOpacity : 0.92
+    if (bgRgb) {
+      app.style.background = rgbToStr(bgRgb[0], bgRgb[1], bgRgb[2], bgOp)
+    }
+
+    // Text color with text opacity
+    const textColor = autoTextColor(bg)
+    const textRgb = hexToRgb(textColor)
+    const textOp = s.textOpacity !== undefined ? s.textOpacity : 1
+    if (textRgb) {
+      app.style.setProperty('--text', rgbToStr(textRgb[0], textRgb[1], textRgb[2], textOp))
+    }
+
+    // Font
+    if (s.fontSize) app.style.setProperty('--font-size', s.fontSize + 'px')
+    if (s.fontFamily) app.style.fontFamily = s.fontFamily
+
+    // Update settings panel controls
+    const syncUI = (id, val) => {
+      const el = $(id)
+      if (!el) return
+      if (el.type === 'checkbox') el.checked = !!val
+      else el.value = val
+    }
+    syncUI('#s-font-size', s.fontSize)
+    syncUI('#s-font-family', s.fontFamily)
+    syncUI('#s-bg-color', s.bgColor)
+    syncUI('#s-bg-opacity', s.bgOpacity !== undefined ? s.bgOpacity : 0.92)
+    syncUI('#s-text-opacity', s.textOpacity !== undefined ? s.textOpacity : 1)
+    syncUI('#s-theme', s.theme)
+    syncUI('#s-auto-start', s.autoStart)
+    syncUI('#s-always-on-top', s.alwaysOnTop)
+    const autoLabel = $('#s-auto-start-label')
+    if (autoLabel) autoLabel.textContent = s.autoStart ? 'On' : 'Off'
+    const ontopLabel = $('#s-always-on-top-label')
+    if (ontopLabel) ontopLabel.textContent = s.alwaysOnTop ? 'On' : 'Off'
+  }
+
+  /* =============================================
+     HELPERS
+     ============================================= */
+  function fullName(m) {
+    return [m.first_name, m.last_name].filter(Boolean).join(' ')
+  }
+
+  function escHtml(s) {
+    const d = document.createElement('div')
+    d.textContent = s
+    return d.innerHTML
+  }
+
+  function calcAge(dob) {
+    if (!dob) return null
+    const today = new Date()
+    const b = new Date(dob + 'T00:00:00')
+    let age = today.getFullYear() - b.getFullYear()
+    const m = today.getMonth() - b.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--
+    return age
+  }
+
+  function fmtDate(date) {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  /* =============================================
+     SVG ICONS (modern, inline)
+     ============================================= */
+  var SVGS = {
+    birthday: '<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="0.8"><path d="M3 7h10v7a1 1 0 01-1 1H4a1 1 0 01-1-1V7z"/><rect x="4" y="4" width="2" height="3" rx="0.5"/><rect x="7" y="3" width="2" height="4" rx="0.5"/><rect x="10" y="4" width="2" height="3" rx="0.5"/><rect x="2" y="7" width="12" height="1.5" rx="0.5"/></svg>',
+    anniversary: '<svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="0.8"><path d="M8 14C2 9 0 6 0 4.5 0 2 2 0 4.5 0 6 0 7.5 1 8 2 8.5 1 10 0 11.5 0 14 0 16 2 16 4.5 16 6 14 9 8 14z"/></svg>',
+    loading: '<svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7" stroke-dasharray="30 14" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 10 10" to="360 10 10" dur="0.8s" repeatCount="indefinite"/></circle></svg>',
+    error: '<svg viewBox="0 0 18 18" width="18" height="18" fill="currentColor"><path d="M9 1a8 8 0 100 16A8 8 0 009 1zM8 5h2v5H8V5zm0 6h2v2H8v-2z"/></svg>',
+    empty: '<svg viewBox="-3 -3 34 34" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><g transform="rotate(12 14 14)"><path d="M14 4l11 23H3z"/><circle cx="14" cy="4" r="4" fill="currentColor" stroke="none"/><path d="M4 24c3 1.5 6 1.5 10 0s6 1.5 10 0"/></g></svg>',
+  }
+
+  /* =============================================
+     FETCH EVENTS (members + relationships)
+     ============================================= */
+  async function fetchEvents() {
+    const container = $('#events-list')
+    if (container) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + SVGS.loading + '</div><div>Loading...</div></div>'
+    }
+
+    try {
+      const env = await window.electronAPI.getEnv()
+      if (!env.url || !env.key) throw new Error('Missing Supabase credentials')
+
+      const { createClient } = window.supabase
+      const supabase = createClient(env.url, env.key)
+
+      // Fetch members with upcoming-event-relevant fields
+      const { data: members, error: mErr } = await supabase
+        .from('members')
+        .select('id, first_name, last_name, date_of_birth, wedding_anniversary, relationship_status')
+        .limit(1000)
+
+      if (mErr) throw mErr
+
+      // Fetch relationships to build spouse map
+      const { data: rels, error: rErr } = await supabase
+        .from('relationships')
+        .select('member_id, related_member_id, relationship_type')
+
+      if (rErr) throw rErr
+
+      // Build spouse map: member_id -> spouse_name
+      const spouseMap = {}
+      if (rels) {
+        // Collect all spouse pairings
+        for (const r of rels) {
+          if (r.relationship_type === 'spouse') {
+            const a = r.member_id
+            const b = r.related_member_id
+            if (!spouseMap[a]) spouseMap[a] = []
+            spouseMap[a].push(b)
+          }
+        }
+        // Resolve spouse names
+        for (const id of Object.keys(spouseMap)) {
+          const spouseIds = spouseMap[id]
+          const names = spouseIds.map(sid => {
+            const m = members ? members.find(mm => mm.id === sid) : null
+            return m ? fullName(m) : null
+          }).filter(Boolean)
+          spouseMap[id] = names[0] || ''
+        }
+      }
+
+      // Enrich members with spouse_name
+      events = (members || []).map(m => ({
+        ...m,
+        spouse_name: spouseMap[m.id] || null,
+      }))
+
+      buildList()
+      if ($('#view-calendar').classList.contains('active')) buildCalendar()
+    } catch (err) {
+      console.error('Fetch error:', err)
+      const container = $('#events-list')
+      if (container) {
+        container.innerHTML =
+          '<div class="empty-state"><div class="empty-state-icon">' + SVGS.error + '</div><div>Failed to load data</div></div>'
+      }
+    }
+  }
+
+  /* =============================================
+     BUILD LIST (upcoming events, sorted)
+     ============================================= */
+  function buildList() {
+    const container = $('#events-list')
+    if (!container) return
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const upcoming = []
+
+    for (const m of events) {
+      const name = fullName(m)
+
+      // Birthday
+      if (m.date_of_birth) {
+        const dob = new Date(m.date_of_birth + 'T00:00:00')
+        const thisYear = new Date(today.getFullYear(), dob.getMonth(), dob.getDate())
+        if (thisYear < today) thisYear.setFullYear(today.getFullYear() + 1)
+        const days = Math.round((thisYear - today) / (1000 * 60 * 60 * 24))
+        upcoming.push({
+          name: name,
           type: 'birthday',
-          name: fullName,
+          icon: SVGS.birthday,
           date: thisYear,
-          daysAway: diff,
-          detail: `Turns ${calculateAge(m.date_of_birth) + 1}`,
+          days,
+          detail: 'Turns ' + (calcAge(m.date_of_birth) + 1),
+        })
+      }
+
+      // Anniversary (only if married)
+      if (m.wedding_anniversary && m.relationship_status === 'married') {
+        const ann = new Date(m.wedding_anniversary + 'T00:00:00')
+        const thisYear = new Date(today.getFullYear(), ann.getMonth(), ann.getDate())
+        if (thisYear < today) thisYear.setFullYear(today.getFullYear() + 1)
+        const days = Math.round((thisYear - today) / (1000 * 60 * 60 * 24))
+        const years = today.getFullYear() - ann.getFullYear() + (thisYear.getFullYear() > today.getFullYear() ? 1 : 0)
+        const displayName = m.spouse_name ? name + ' & ' + m.spouse_name : name
+        upcoming.push({
+          name: displayName,
+          type: 'anniversary',
+          icon: SVGS.anniversary,
+          date: thisYear,
+          days,
+          detail: years + ' year' + (years !== 1 ? 's' : ''),
         })
       }
     }
 
-    if (m.wedding_anniversary && m.relationship_status === 'married') {
-      const ann = new Date(m.wedding_anniversary + 'T00:00:00')
-      const thisYear = new Date(today.getFullYear(), ann.getMonth(), ann.getDate())
-      if (thisYear < today) thisYear.setFullYear(today.getFullYear() + 1)
-      const diff = Math.round((thisYear - today) / (1000 * 60 * 60 * 24))
-      if (diff <= daysAhead) {
-        const years = today.getFullYear() - ann.getFullYear() + (thisYear.getFullYear() > today.getFullYear() ? 1 : 0)
-        events.push({
-          type: 'anniversary',
-          name: fullName,
-          date: thisYear,
-          daysAway: diff,
-          detail: `${years} year${years !== 1 ? 's' : ''}`,
-        })
-      }
+    upcoming.sort((a, b) => a.days - b.days)
+
+    // Only show this week's events
+    const weekEvents = upcoming.filter(function (e) { return e.days <= 7 })
+
+    if (weekEvents.length === 0) {
+      container.innerHTML =
+        '<div class="empty-state"><div class="empty-state-icon">' + SVGS.empty + '</div><div>No events this week</div></div>'
+      return
     }
+
+    let html = ''
+    for (const item of weekEvents) {
+      const daysLabel = item.days === 0 ? 'Today!' : (item.days === 1 ? 'Tomorrow' : item.days + 'd')
+      const daysClass = item.days === 0 ? 'today' : (item.days <= 7 ? 'soon' : '')
+      html +=
+        '<div class="event-item">' +
+          '<div class="event-icon ' + item.type + '">' + item.icon + '</div>' +
+          '<div class="event-info">' +
+            '<div class="event-name">' + escHtml(item.name) + '</div>' +
+            '<div class="event-detail">' + escHtml(item.detail) + ' &#183; ' + escHtml(fmtDate(item.date)) + '</div>' +
+          '</div>' +
+          '<div class="event-days ' + daysClass + '">' + daysLabel + '</div>' +
+        '</div>'
+    }
+    container.innerHTML = html
   }
 
-  return events.sort((a, b) => a.daysAway - b.daysAway)
-}
+  /* =============================================
+     BUILD CALENDAR (array-per-day events, JS hover tooltip)
+     ============================================= */
+  function buildCalendar() {
+    const grid = $('#calendar-grid')
+    const label = $('#cal-label')
+    const tooltipArea = $('#calendar-tooltip-area')
+    if (!grid || !label) return
 
-function getCalendarEvents(year, month) {
-  const events = {}
-  for (const m of members) {
-    const fullName = `${m.first_name} ${m.last_name}`
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December']
+    label.textContent = monthNames[calMonth] + ' ' + calYear
 
-    if (m.date_of_birth) {
-      const dob = new Date(m.date_of_birth + 'T00:00:00')
-      if (dob.getMonth() === month) {
-        const day = dob.getDate()
-        if (!events[day]) events[day] = []
-        events[day].push({ type: 'birthday', name: fullName })
+    const dayNames = ['S','M','T','W','T','F','S']
+    const firstDay = new Date(calYear, calMonth, 1).getDay()
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
+    const today = new Date()
+
+    // Build array-per-day event structure (like web app's getCalendarEvents)
+    const eventsByDay = {}
+    for (const m of events) {
+      const name = fullName(m)
+
+      // Birthday
+      if (m.date_of_birth) {
+        const bd = new Date(m.date_of_birth + 'T00:00:00')
+        if (bd.getMonth() === calMonth) {
+          const day = bd.getDate()
+          if (!eventsByDay[day]) eventsByDay[day] = []
+          eventsByDay[day].push({ type: 'birthday', name })
+        }
       }
-    }
 
-    if (m.wedding_anniversary && m.relationship_status === 'married') {
-      const ann = new Date(m.wedding_anniversary + 'T00:00:00')
-      if (ann.getMonth() === month) {
-        const day = ann.getDate()
-        if (!events[day]) events[day] = []
-        if (!events[day].some(e => e.type === 'anniversary' && e.name === fullName)) {
-          events[day].push({ type: 'anniversary', name: fullName })
+      // Anniversary (only if married)
+      if (m.wedding_anniversary && m.relationship_status === 'married') {
+        const ann = new Date(m.wedding_anniversary + 'T00:00:00')
+        if (ann.getMonth() === calMonth) {
+          const day = ann.getDate()
+          if (!eventsByDay[day]) eventsByDay[day] = []
+          const displayName = m.spouse_name ? name + ' & ' + m.spouse_name : name
+          // Deduplicate same-couple anniversaries
+          if (!m.spouse_name || !eventsByDay[day].some(e => e.type === 'anniversary' && e.name.includes(m.spouse_name))) {
+            eventsByDay[day].push({ type: 'anniversary', name: displayName })
+          }
         }
       }
     }
-  }
 
-  return events
-}
+    // Build grid HTML
+    let html = dayNames.map(d => '<div class="cal-day-header">' + d + '</div>').join('')
 
-// =============================================
-// LIST VIEW
-// =============================================
-function renderListView() {
-  const container = document.getElementById('events-list')
-  const events = getUpcomingEvents(7)
-
-  if (events.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">&#127881;</div>
-        <div>No birthdays or anniversaries in the next 7 days</div>
-      </div>`
-    return
-  }
-
-  container.innerHTML = events.map(ev => {
-    const icon = ev.type === 'birthday' ? '&#127874;' : '&#10084;'
-    const daysClass = ev.daysAway === 0 ? 'today' : ev.daysAway <= 2 ? 'soon' : ''
-    const daysText = ev.daysAway === 0 ? 'Today!' : ev.daysAway === 1 ? 'Tomorrow' : `${ev.daysAway}d`
-    return `
-      <div class="event-item">
-        <div class="event-icon ${ev.type}">${icon}</div>
-        <div class="event-info">
-          <div class="event-name">${ev.name}</div>
-          <div class="event-detail">${ev.type === 'birthday' ? 'Birthday' : 'Anniversary'} &middot; ${ev.detail}</div>
-        </div>
-        <div class="event-days ${daysClass}">${daysText}</div>
-      </div>`
-  }).join('')
-}
-
-// =============================================
-// CALENDAR VIEW
-// =============================================
-function renderCalendarView() {
-  document.getElementById('cal-label').textContent = `${MONTHS[viewMonth]} ${viewYear}`
-
-  const events = getCalendarEvents(viewYear, viewMonth)
-  const now = new Date()
-  const firstDay = new Date(viewYear, viewMonth, 1).getDay()
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
-
-  let html = DAYS.map(d => `<div class="cal-day-header">${d}</div>`).join('')
-  for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>'
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dayEvents = events[d] || []
-    const hasBirthday = dayEvents.some(e => e.type === 'birthday')
-    const hasAnniversary = dayEvents.some(e => e.type === 'anniversary')
-    const isToday = d === now.getDate() && viewMonth === now.getMonth() && viewYear === now.getFullYear()
-
-    let cls = 'cal-day'
-    if (hasBirthday && hasAnniversary) cls += ' has-event both'
-    else if (hasBirthday) cls += ' has-event birthday'
-    else if (hasAnniversary) cls += ' has-event anniversary'
-    if (isToday) cls += ' today'
-
-    const tooltip = dayEvents.length > 0
-      ? `<div class="cal-tooltip">${dayEvents.map(e =>
-          `<div>${e.type === 'birthday' ? '&#127874;' : '&#10084;'} ${e.name}</div>`
-        ).join('')}</div>`
-      : ''
-
-    html += `<div class="${cls}"><span class="cal-day-num">${d}</span>${tooltip}</div>`
-  }
-
-  document.getElementById('calendar-grid').innerHTML = html
-}
-
-// =============================================
-// SETTINGS
-// =============================================
-function applySettings(s) {
-  const app = document.getElementById('app')
-  app.className = `theme-${s.theme || 'dark'}`
-  app.style.fontSize = `${s.fontSize || 14}px`
-  app.style.fontFamily = s.fontFamily || 'Segoe UI, sans-serif'
-  app.style.background = s.bgColor || undefined
-  document.getElementById('settings-panel').style.background = s.bgColor || undefined
-
-  if (s.view === 'list') switchView('list')
-  else switchView('calendar')
-
-  // Sync settings UI
-  document.getElementById('s-font-size').value = s.fontSize || 14
-  document.getElementById('s-font-family').value = s.fontFamily || 'Segoe UI, sans-serif'
-  document.getElementById('s-bg-color').value = s.bgColor || '#2d2d2d'
-  document.getElementById('s-opacity').value = s.opacity || 0.92
-  document.getElementById('s-theme').value = s.theme || 'dark'
-}
-
-function setupSettingsUI() {
-  document.getElementById('btn-settings').onclick = () => {
-    document.getElementById('settings-panel').classList.remove('hidden')
-  }
-
-  document.getElementById('btn-settings-close').onclick = async () => {
-    const newSettings = {
-      fontSize: parseInt(document.getElementById('s-font-size').value),
-      fontFamily: document.getElementById('s-font-family').value,
-      bgColor: document.getElementById('s-bg-color').value,
-      opacity: parseFloat(document.getElementById('s-opacity').value),
-      theme: document.getElementById('s-theme').value,
-    }
-    await window.electronAPI.saveSettings(newSettings)
-    document.getElementById('settings-panel').classList.add('hidden')
-  }
-}
-
-// =============================================
-// VIEW SWITCHING
-// =============================================
-function switchView(view) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
-
-  if (view === 'list') {
-    document.getElementById('tab-list').classList.add('active')
-    document.getElementById('view-list').classList.add('active')
-  } else {
-    document.getElementById('tab-calendar').classList.add('active')
-    document.getElementById('view-calendar').classList.add('active')
-  }
-}
-
-function setupTabs() {
-  document.getElementById('tab-list').onclick = () => {
-    switchView('list')
-    window.electronAPI.saveSettings({ view: 'list' })
-  }
-  document.getElementById('tab-calendar').onclick = () => {
-    switchView('calendar')
-    window.electronAPI.saveSettings({ view: 'calendar' })
-  }
-}
-
-// =============================================
-// CALENDAR NAV
-// =============================================
-function setupCalendarNav() {
-  document.getElementById('cal-prev').onclick = () => {
-    if (viewMonth === 0) { viewMonth = 11; viewYear-- }
-    else viewMonth--
-    renderCalendarView()
-  }
-
-  document.getElementById('cal-next').onclick = () => {
-    if (viewMonth === 11) { viewMonth = 0; viewYear++ }
-    else viewMonth++
-    renderCalendarView()
-  }
-}
-
-// =============================================
-// TITLE BAR
-// =============================================
-function setupTitleBar() {
-  document.getElementById('btn-refresh').onclick = fetchMembers
-  document.getElementById('btn-close').onclick = () => window.close()
-}
-
-// =============================================
-// RESIZE
-// =============================================
-function setupResize() {
-  const handle = document.getElementById('resize-handle')
-  let resizing = false
-
-  handle.onmousedown = (e) => {
-    resizing = true
-    const startX = e.clientX
-    const startY = e.clientY
-    const startW = window.innerWidth
-    const startH = window.innerHeight
-
-    document.onmousemove = (ev) => {
-      if (!resizing) return
-      const newW = Math.max(240, startW + (ev.clientX - startX))
-      const newH = Math.max(200, startH + (ev.clientY - startY))
-      window.resizeTo(newW, newH)
+    for (let i = 0; i < firstDay; i++) {
+      html += '<div class="cal-day empty"></div>'
     }
 
-    document.onmouseup = () => {
-      resizing = false
-      document.onmousemove = null
-      document.onmouseup = null
-      window.electronAPI.saveSettings({
-        width: window.innerWidth,
-        height: window.innerHeight,
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dayEvents = eventsByDay[d] || []
+      const hasBirthday = dayEvents.some(e => e.type === 'birthday')
+      const hasAnniversary = dayEvents.some(e => e.type === 'anniversary')
+      const isToday = calYear === today.getFullYear() && calMonth === today.getMonth() && d === today.getDate()
+
+      let classes = 'cal-day'
+      if (isToday) classes += ' today'
+      if (dayEvents.length > 0) classes += ' has-event'
+      if (hasBirthday && hasAnniversary) classes += ' has-both'
+      else if (hasBirthday) classes += ' has-birthday'
+      else if (hasAnniversary) classes += ' has-anniversary'
+
+      html +=
+        '<div class="' + classes + '" data-day="' + d + '">' +
+          '<span class="cal-day-num">' + d + '</span>' +
+        '</div>'
+    }
+
+    grid.innerHTML = html
+
+    // Wire up hover events for tooltip
+    const dayEls = grid.querySelectorAll('.cal-day.has-event')
+    for (const el of dayEls) {
+      el.addEventListener('mouseenter', function () {
+        const day = parseInt(this.dataset.day, 10)
+        const dayEvents = eventsByDay[day] || []
+        if (dayEvents.length === 0) return
+        let tooltipHtml = ''
+        for (const ev of dayEvents) {
+          const icon = ev.type === 'birthday' ? SVGS.birthday : SVGS.anniversary
+          const iconClass = ev.type === 'birthday' ? 'birthday' : 'anniversary'
+          tooltipHtml +=
+            '<div class="tt-event">' +
+              '<span class="tt-icon ' + iconClass + '">' + icon + '</span>' +
+              '<span>' + escHtml(ev.name) + '</span>' +
+            '</div>'
+        }
+        if (tooltipArea) {
+          tooltipArea.innerHTML = tooltipHtml
+          tooltipArea.classList.remove('hidden')
+        }
+      })
+      el.addEventListener('mouseleave', function () {
+        if (tooltipArea) tooltipArea.classList.add('hidden')
       })
     }
 
-    e.preventDefault()
+    // Hide tooltip on leaving the grid entirely
+    grid.addEventListener('mouseleave', function () {
+      if (tooltipArea) tooltipArea.classList.add('hidden')
+    })
   }
-}
 
-// =============================================
-// START
-// =============================================
-document.addEventListener('DOMContentLoaded', init)
+  /* =============================================
+     SETTINGS PANEL — own page (hides views)
+     ============================================= */
+  function showSettings() {
+    $$('.view').forEach(v => v.classList.remove('active'))
+    $('#settings-panel').classList.remove('hidden')
+  }
+
+  function hideSettings() {
+    $('#settings-panel').classList.add('hidden')
+    const activeTab = $('.tab.active')
+    if (activeTab) {
+      const view = document.getElementById('view-' + activeTab.dataset.view)
+      if (view) view.classList.add('active')
+    }
+  }
+
+  function collectSettingsFromUI() {
+    return {
+      fontSize: parseInt($('#s-font-size').value, 10),
+      fontFamily: $('#s-font-family').value,
+      bgColor: $('#s-bg-color').value,
+      bgOpacity: parseFloat($('#s-bg-opacity').value),
+      textOpacity: parseFloat($('#s-text-opacity').value),
+      theme: $('#s-theme').value,
+      autoStart: $('#s-auto-start').checked,
+      alwaysOnTop: $('#s-always-on-top').checked,
+    }
+  }
+
+  /* =============================================
+     DROPDOWN MENU
+     ============================================= */
+  function toggleMenu() {
+    $('#dropdown-menu').classList.toggle('hidden')
+  }
+
+  function hideMenu() {
+    $('#dropdown-menu').classList.add('hidden')
+  }
+
+  /* =============================================
+     DRAG & RESIZE
+     ============================================= */
+  let isDragging = false, dragStartX, dragStartY, winStartX, winStartY
+  let isResizing = false, resizeStartX, resizeStartY, resizeW, resizeH
+
+  function initDrag() {
+    const titlebar = $('#titlebar-drag')
+    if (!titlebar) return
+
+    titlebar.addEventListener('mousedown', (e) => {
+      if (e.target.closest('#titlebar-actions')) return
+      isDragging = true
+      dragStartX = e.screenX
+      dragStartY = e.screenY
+      winStartX = window.screenX
+      winStartY = window.screenY
+      e.preventDefault()
+    })
+  }
+
+  function initResize() {
+    const handle = $('#resize-handle')
+    if (!handle) return
+
+    handle.addEventListener('mousedown', (e) => {
+      isResizing = true
+      resizeStartX = e.screenX
+      resizeStartY = e.screenY
+      resizeW = window.innerWidth
+      resizeH = window.innerHeight
+      e.preventDefault()
+      e.stopPropagation()
+    })
+  }
+
+  document.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+      const dx = e.screenX - dragStartX
+      const dy = e.screenY - dragStartY
+      window.moveTo(winStartX + dx, winStartY + dy)
+    }
+    if (isResizing) {
+      const dw = e.screenX - resizeStartX
+      const dh = e.screenY - resizeStartY
+      window.resizeTo(Math.max(250, resizeW + dw), Math.max(200, resizeH + dh))
+    }
+  })
+
+  document.addEventListener('mouseup', () => {
+    if (isDragging || isResizing) {
+      try {
+        window.electronAPI.saveSettings({
+          width: window.innerWidth,
+          height: window.innerHeight,
+          x: window.screenX,
+          y: window.screenY,
+        })
+      } catch {}
+    }
+    isDragging = false
+    isResizing = false
+  })
+
+  /* =============================================
+     INIT
+     ============================================= */
+  async function init() {
+    try {
+      settings = await window.electronAPI.getSettings()
+    } catch {}
+    if (!settings || !settings.theme) settings = {
+      width: 340, height: 480, fontSize: 14,
+      fontFamily: 'Segoe UI, sans-serif', bgColor: '#2d2d2d',
+      bgOpacity: 0.92, textOpacity: 1, theme: 'dark',
+      view: 'list', autoStart: false, alwaysOnTop: true,
+    }
+
+    applySettings(settings)
+
+    // Tab switching
+    $$('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        hideMenu()
+        $$('.tab').forEach(t => t.classList.remove('active'))
+        tab.classList.add('active')
+        $$('.view').forEach(v => v.classList.remove('active'))
+        const tooltipArea = $('#calendar-tooltip-area')
+        if (tooltipArea) tooltipArea.classList.add('hidden')
+        const view = document.getElementById('view-' + tab.dataset.view)
+        if (view) {
+          view.classList.add('active')
+          if (tab.dataset.view === 'calendar') buildCalendar()
+        }
+        window.electronAPI.saveSettings({ view: tab.dataset.view })
+      })
+    })
+
+    // Calendar nav
+    $('#cal-prev').addEventListener('click', () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear-- } buildCalendar(); hideMenu() })
+    $('#cal-next').addEventListener('click', () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++ } buildCalendar(); hideMenu() })
+
+    // Dots menu
+    $('#btn-dots').addEventListener('click', (e) => { e.stopPropagation(); toggleMenu() })
+    $('#dropdown-settings').addEventListener('click', () => { hideMenu(); showSettings() })
+    $('#dropdown-refresh').addEventListener('click', () => { hideMenu(); fetchEvents() })
+    $('#dropdown-close').addEventListener('click', () => { hideMenu(); window.close() })
+
+    // Close menu on outside click
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.dropdown')) hideMenu()
+    })
+
+    // Settings controls — all preview live on input
+    $('#s-font-size').addEventListener('input', () => {
+      applySettings(collectSettingsFromUI())
+    })
+    $('#s-font-family').addEventListener('input', () => {
+      applySettings(collectSettingsFromUI())
+    })
+    $('#s-bg-color').addEventListener('input', () => {
+      applySettings(collectSettingsFromUI())
+    })
+    $('#s-bg-opacity').addEventListener('input', () => {
+      applySettings(collectSettingsFromUI())
+    })
+    $('#s-text-opacity').addEventListener('input', () => {
+      applySettings(collectSettingsFromUI())
+    })
+    $('#s-theme').addEventListener('input', () => {
+      applySettings(collectSettingsFromUI())
+    })
+    $('#s-auto-start').addEventListener('input', () => {
+      const s = collectSettingsFromUI()
+      applySettings(s)
+      window.electronAPI.saveSettings(s)
+    })
+    $('#s-always-on-top').addEventListener('input', () => {
+      const s = collectSettingsFromUI()
+      applySettings(s)
+      window.electronAPI.saveSettings(s)
+    })
+    // Done: save everything and close
+    $('#btn-settings-close').addEventListener('click', () => {
+      const s = collectSettingsFromUI()
+      applySettings(s)
+      window.electronAPI.saveSettings(s)
+      hideSettings()
+    })
+
+    // Listen for settings updates from main process
+    if (window.electronAPI.onSettingsUpdated) {
+      window.electronAPI.onSettingsUpdated((s) => applySettings(s))
+    }
+
+    // Drag & Resize
+    initDrag()
+    initResize()
+
+    // Fetch events
+    fetchEvents()
+
+    // Refresh weekly
+    setInterval(fetchEvents, 7 * 24 * 60 * 60 * 1000)
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const script = document.createElement('script')
+    script.src = 'https://unpkg.com/@supabase/supabase-js@2'
+    script.onload = init
+    document.head.appendChild(script)
+  })
+})()
