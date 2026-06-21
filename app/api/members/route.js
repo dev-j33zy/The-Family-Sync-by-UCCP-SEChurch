@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { assignMemberCode } from '@/lib/member-code'
 import { NextResponse } from 'next/server'
 
 export async function GET(request) {
@@ -76,7 +77,16 @@ export async function POST(request) {
       .single()
 
     if (error) throw error
-    return NextResponse.json(data, { status: 201 })
+
+    await assignMemberCode(supabase, data.id)
+
+    const { data: updated } = await supabase
+      .from('members')
+      .select('*')
+      .eq('id', data.id)
+      .single()
+
+    return NextResponse.json(updated, { status: 201 })
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

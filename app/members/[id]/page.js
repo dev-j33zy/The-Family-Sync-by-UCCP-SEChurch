@@ -385,6 +385,11 @@ export default function MemberDetailPage({ params }) {
                 </div>
               <div className="member-detail-info">
                   <div className="member-detail-name">{getFullName(member)}</div>
+                  {member.member_code && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '2px' }}>
+                      ID: {member.member_code}
+                    </div>
+                  )}
                   <div className="member-detail-meta">
                     {member.family_groups?.name && <span>{member.family_groups.name} · </span>}
                     {age} years old · {capitalize(member.gender)}

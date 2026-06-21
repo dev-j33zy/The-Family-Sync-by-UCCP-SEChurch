@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { assignMemberCode } from '@/lib/member-code'
 
 export async function POST(request) {
   const supabase = await createServerSupabaseClient()
@@ -41,7 +42,16 @@ export async function POST(request) {
 
     if (error) throw error
 
-    return Response.json({ data, count: data.length })
+    for (const member of data) {
+      await assignMemberCode(supabase, member.id)
+    }
+
+    const { data: updated } = await supabase
+      .from('members')
+      .select('*')
+      .in('id', data.map(m => m.id))
+
+    return Response.json({ data: updated, count: updated?.length || 0 })
   } catch (err) {
     return Response.json({ error: err.message }, { status: 500 })
   }

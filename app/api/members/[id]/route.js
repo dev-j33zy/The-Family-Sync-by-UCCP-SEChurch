@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { assignMemberCode } from '@/lib/member-code'
 import { NextResponse } from 'next/server'
 
 export async function GET(request, { params }) {
@@ -67,6 +68,11 @@ export async function PUT(request, { params }) {
       .single()
 
     if (error) throw error
+
+    // Regenerate member_code if date_of_membership changed
+    if ('date_of_membership' in body) {
+      await assignMemberCode(supabase, id)
+    }
 
     // Sync wedding_anniversary with spouse
     if ('wedding_anniversary' in body) {

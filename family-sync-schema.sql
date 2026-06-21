@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS members (
   city TEXT,
   registered_at TIMESTAMPTZ DEFAULT NOW(),
   profile_picture TEXT,
+  member_code TEXT UNIQUE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
