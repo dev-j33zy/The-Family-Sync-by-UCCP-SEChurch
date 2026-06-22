@@ -190,6 +190,8 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+#view-tabs.hidden { display: none; }
+
 .tab {
   flex: 1;
   padding: 5px;

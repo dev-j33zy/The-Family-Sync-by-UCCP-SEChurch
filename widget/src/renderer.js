@@ -510,6 +510,7 @@
     // Tab switching
     $$('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
+        if (!$('#settings-panel').classList.contains('hidden')) hideSettings()
         hideMenu()
         $$('.tab').forEach(t => t.classList.remove('active'))
         tab.classList.add('active')
