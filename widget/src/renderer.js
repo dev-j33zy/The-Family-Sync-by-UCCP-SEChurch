@@ -389,11 +389,13 @@
      ============================================= */
   function showSettings() {
     $$('.view').forEach(v => v.classList.remove('active'))
+    $('#view-tabs').classList.add('hidden')
     $('#settings-panel').classList.remove('hidden')
   }
 
   function hideSettings() {
     $('#settings-panel').classList.add('hidden')
+    $('#view-tabs').classList.remove('hidden')
     const activeTab = $('.tab.active')
     if (activeTab) {
       const view = document.getElementById('view-' + activeTab.dataset.view)
