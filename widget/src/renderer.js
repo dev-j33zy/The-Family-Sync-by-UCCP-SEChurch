@@ -52,7 +52,13 @@
     const bgRgb = hexToRgb(bg)
     const bgOp = s.bgOpacity !== undefined ? s.bgOpacity : 0.92
     if (bgRgb) {
+<<<<<<< Updated upstream
       app.style.background = rgbToStr(bgRgb[0], bgRgb[1], bgRgb[2], bgOp)
+=======
+      const bgWithOpacity = rgbToStr(bgRgb[0], bgRgb[1], bgRgb[2], bgOp)
+      app.style.background = bgWithOpacity
+      app.style.setProperty('--bg', bgWithOpacity)
+>>>>>>> Stashed changes
     }
 
     // Text color with text opacity
@@ -79,7 +85,11 @@
     syncUI('#s-bg-color', s.bgColor)
     syncUI('#s-bg-opacity', s.bgOpacity !== undefined ? s.bgOpacity : 0.92)
     syncUI('#s-text-opacity', s.textOpacity !== undefined ? s.textOpacity : 1)
+<<<<<<< Updated upstream
     syncUI('#s-theme', s.theme)
+=======
+    syncUI('#s-theme-input', s.theme)
+>>>>>>> Stashed changes
     syncUI('#s-auto-start', s.autoStart)
     syncUI('#s-always-on-top', s.alwaysOnTop)
     const autoLabel = $('#s-auto-start-label')
@@ -410,7 +420,11 @@
       bgColor: $('#s-bg-color').value,
       bgOpacity: parseFloat($('#s-bg-opacity').value),
       textOpacity: parseFloat($('#s-text-opacity').value),
+<<<<<<< Updated upstream
       theme: $('#s-theme').value,
+=======
+      theme: $('#s-theme-input').value,
+>>>>>>> Stashed changes
       autoStart: $('#s-auto-start').checked,
       alwaysOnTop: $('#s-always-on-top').checked,
     }
@@ -554,7 +568,11 @@
     $('#s-text-opacity').addEventListener('input', () => {
       applySettings(collectSettingsFromUI())
     })
+<<<<<<< Updated upstream
     $('#s-theme').addEventListener('input', () => {
+=======
+    $('#s-theme-input').addEventListener('input', () => {
+>>>>>>> Stashed changes
       applySettings(collectSettingsFromUI())
     })
     $('#s-auto-start').addEventListener('input', () => {
@@ -586,6 +604,27 @@
     document.addEventListener('click', () => {
       fontOptions.classList.add('hidden')
     })
+<<<<<<< Updated upstream
+=======
+    // Theme picker
+    const themeInput = $('#s-theme-input')
+    const themeOptions = $('#s-theme-options')
+    themeInput.addEventListener('click', (e) => {
+      e.stopPropagation()
+      themeOptions.classList.toggle('hidden')
+    })
+    themeOptions.querySelectorAll('.font-option').forEach(function (opt) {
+      opt.addEventListener('click', function (e) {
+        e.stopPropagation()
+        themeInput.value = this.dataset.value
+        themeOptions.classList.add('hidden')
+        applySettings(collectSettingsFromUI())
+      })
+    })
+    document.addEventListener('click', () => {
+      themeOptions.classList.add('hidden')
+    })
+>>>>>>> Stashed changes
     // Done: save everything and close
     $('#btn-settings-close').addEventListener('click', () => {
       const s = collectSettingsFromUI()
