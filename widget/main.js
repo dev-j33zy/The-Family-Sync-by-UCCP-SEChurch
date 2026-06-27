@@ -92,10 +92,7 @@ function createWindow() {
 
   applyAutoStart(!!settings.autoStart)
 
-<<<<<<< Updated upstream
   // Debounced save position on drag end
-=======
->>>>>>> Stashed changes
   let moveTimer = null
   mainWindow.on('move', () => {
     clearTimeout(moveTimer)
@@ -108,9 +105,6 @@ function createWindow() {
       })
     }, 400)
   })
-<<<<<<< Updated upstream
-=======
-
   let resizeTimer = null
   mainWindow.on('resize', () => {
     clearTimeout(resizeTimer)
@@ -123,7 +117,6 @@ function createWindow() {
       })
     }, 400)
   })
->>>>>>> Stashed changes
 
   mainWindow.on('close', () => {
     const bounds = mainWindow.getBounds()

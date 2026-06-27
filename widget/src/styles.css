@@ -595,11 +595,8 @@ body {
   font-size: calc(var(--font-size) * 0.79);
   color: var(--text);
   cursor: pointer;
-<<<<<<< Updated upstream
-=======
   background: var(--bg-secondary);
   transition: background 0.1s;
->>>>>>> Stashed changes
 }
 
 .font-option:hover {
@@ -608,12 +605,8 @@ body {
 }
 
 .font-option.selected {
-<<<<<<< Updated upstream
-  background: var(--bg-secondary);
-=======
   background: var(--accent);
   color: var(--accent-text);
->>>>>>> Stashed changes
   font-weight: 600;
 }
 
