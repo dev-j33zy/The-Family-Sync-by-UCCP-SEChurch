@@ -109,7 +109,7 @@ function toggleMainWindow() {
 function createWindow() {
   const settings = loadSettings()
   const display = screen.getPrimaryDisplay().workAreaSize
-  const useTray = settings.autoStart && settings.startInTray
+  const startInTray = settings.startInTray
 
   const winSettings = {
     width: Math.min(settings.width, display.width),
@@ -121,9 +121,9 @@ function createWindow() {
     alwaysOnTop: settings.alwaysOnTop !== false,
     transparent: true,
     resizable: true,
-    skipTaskbar: useTray,
+    skipTaskbar: startInTray,
     hasShadow: false,
-    show: !useTray,
+    show: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -141,7 +141,7 @@ function createWindow() {
 
   applyAutoStart(!!settings.autoStart)
 
-  if (useTray) {
+  if (startInTray) {
     createTray()
   }
 
@@ -222,13 +222,6 @@ ipcMain.handle('save-settings', (_, settings) => {
         }
         mainWindow.setSkipTaskbar(false)
         if (!mainWindow.isVisible()) showMainWindow()
-      }
-    }
-    if (merged.autoStart !== undefined || merged.startInTray !== undefined) {
-      const shouldHide = merged.autoStart !== undefined ? !!merged.autoStart : current.autoStart
-      const shouldTray = merged.startInTray !== undefined ? !!merged.startInTray : current.startInTray
-      if (shouldHide && shouldTray) {
-        mainWindow.setSkipTaskbar(true)
       }
     }
     mainWindow.webContents.send('settings-updated', merged)
