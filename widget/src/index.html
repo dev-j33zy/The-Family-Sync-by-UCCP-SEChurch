@@ -11,7 +11,7 @@
     <!-- Title Bar (hidden by default, shows on hover) -->
     <div id="titlebar">
       <div id="titlebar-drag">
-        <span id="title-icon">&#9783;</span>
+          <span id="title-icon"><svg viewBox="0 0 64 64" width="16" height="16"><rect width="64" height="64" rx="10" fill="url(#g)"/><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#6b0e1e"/><stop offset="100%" stop-color="#4a0a15"/></linearGradient></defs><text x="32" y="42" text-anchor="middle" font-family="Inter,Helvetica,sans-serif" font-size="24" font-weight="800" fill="#f5de8d" letter-spacing="1">SEC</text></svg></span>
         <span id="title-text">Family Sync</span>
       </div>
       <div id="titlebar-actions">
@@ -132,7 +132,26 @@
             <span id="s-always-on-top-label">On</span>
           </label>
         </div>
+        <div class="settings-group">
+          <label>Start in System Tray</label>
+          <label class="toggle-label">
+            <input type="checkbox" id="s-start-in-tray">
+            <span class="toggle-slider"></span>
+            <span id="s-start-in-tray-label">Off</span>
+          </label>
+        </div>
         <button id="btn-settings-close" class="btn-primary">Done</button>
+      </div>
+    </div>
+
+    <!-- Update Notification -->
+    <div id="update-notification" class="hidden">
+      <div id="update-content">
+        <div id="update-text">Update available: <span id="update-version"></span></div>
+        <div id="update-actions">
+          <button id="update-install">Install</button>
+          <button id="update-remind">Remind Later</button>
+        </div>
       </div>
     </div>
 

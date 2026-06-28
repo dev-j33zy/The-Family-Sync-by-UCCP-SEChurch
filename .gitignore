@@ -39,6 +39,10 @@ yarn-error.log*
 # widget
 /widget/node_modules
 /widget/.env
+/widget/dist/win-unpacked/
+/widget/dist/builder-debug.yml
+/widget/dist/.icon-ico/
+/widget/test_*.log
 
 # allow example env file
 !.env.example
