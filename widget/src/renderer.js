@@ -573,10 +573,26 @@
       width: 340, height: 480, fontSize: 14,
       fontFamily: 'Segoe UI, sans-serif', bgColor: '#2d2d2d',
       bgOpacity: 0.92, textOpacity: 1, theme: 'dark',
-      view: 'list', autoStart: false, alwaysOnTop: true, startInTray: false,
+      view: 'calendar', autoStart: false, alwaysOnTop: true, startInTray: false,
     }
 
     applySettings(settings)
+
+    // Restore saved view
+    if (settings.view && settings.view !== 'calendar') {
+      const tab = $('.tab[data-view="' + settings.view + '"]')
+      if (tab) {
+        $$('.tab').forEach(t => t.classList.remove('active'))
+        tab.classList.add('active')
+        $$('.view').forEach(v => v.classList.remove('active'))
+        const view = document.getElementById('view-' + tab.dataset.view)
+        if (view) view.classList.add('active')
+      }
+    } else {
+      // Ensure calendar is built on init
+      const calView = $('#view-calendar')
+      if (calView && calView.classList.contains('active')) buildCalendar()
+    }
 
     // Tab switching
     $$('.tab').forEach(tab => {
