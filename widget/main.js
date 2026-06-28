@@ -65,28 +65,11 @@ let mainWindow = null
 let tray = null
 
 function createTrayIcon() {
-  const size = 16
-  const buf = Buffer.alloc(size * size * 4)
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = x - size / 2 + 0.5
-      const dy = y - size / 2 + 0.5
-      const dist = Math.sqrt(dx * dx + dy * dy)
-      const idx = (y * size + x) * 4
-      if (dist < size / 2 - 1) {
-        buf[idx] = 107
-        buf[idx + 1] = 14
-        buf[idx + 2] = 30
-        buf[idx + 3] = 255
-      } else {
-        buf[idx] = 0
-        buf[idx + 1] = 0
-        buf[idx + 2] = 0
-        buf[idx + 3] = 0
-      }
-    }
+  const iconPath = path.join(__dirname, 'assets', 'icon-16.png')
+  if (fs.existsSync(iconPath)) {
+    return nativeImage.createFromPath(iconPath)
   }
-  return nativeImage.createFromBuffer(buf, { width: size, height: size })
+  return nativeImage.createEmpty()
 }
 
 function createTray() {
@@ -134,6 +117,7 @@ function createWindow() {
     x: settings.x,
     y: settings.y,
     frame: false,
+    icon: path.join(__dirname, 'assets', 'icon-48.png'),
     alwaysOnTop: settings.alwaysOnTop !== false,
     transparent: true,
     resizable: true,

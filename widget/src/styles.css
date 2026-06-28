@@ -105,8 +105,9 @@ body {
 }
 
 #title-icon {
-  font-size: 15px;
-  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
 }
 
 #title-text {
