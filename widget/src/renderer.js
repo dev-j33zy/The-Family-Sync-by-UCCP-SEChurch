@@ -36,6 +36,16 @@
     return getLuminance(bgHex) > 0.5 ? '#1a1a1a' : '#e0e0e0'
   }
 
+  function lighten(hex, amount) {
+    const rgb = hexToRgb(hex)
+    if (!rgb) return hex
+    const adjusted = rgb.map(c => {
+      const val = c + Math.round((255 - c) * amount)
+      return Math.min(255, Math.max(0, val))
+    })
+    return '#' + adjusted.map(c => c.toString(16).padStart(2, '0')).join('')
+  }
+
   /* =============================================
      APPLY SETTINGS
      ============================================= */
@@ -54,7 +64,12 @@
     if (bgRgb) {
       const bgWithOpacity = rgbToStr(bgRgb[0], bgRgb[1], bgRgb[2], bgOp)
       app.style.background = bgWithOpacity
-      app.style.setProperty('--bg', bgWithOpacity)
+      // Keep --bg fully opaque for child elements (dropdowns, list items, panels, etc.)
+      app.style.setProperty('--bg', bg)
+      // Compute --bg-secondary from the user's bg color for all themes
+      const lum = getLuminance(bg)
+      const bgSecondary = lum > 0.5 ? lighten(bg, -0.12) : lighten(bg, 0.18)
+      app.style.setProperty('--bg-secondary', bgSecondary)
     }
 
     // Text color with text opacity
@@ -84,10 +99,13 @@
     syncUI('#s-theme-input', s.theme)
     syncUI('#s-auto-start', s.autoStart)
     syncUI('#s-always-on-top', s.alwaysOnTop)
+    syncUI('#s-start-in-tray', s.startInTray)
     const autoLabel = $('#s-auto-start-label')
     if (autoLabel) autoLabel.textContent = s.autoStart ? 'On' : 'Off'
     const ontopLabel = $('#s-always-on-top-label')
     if (ontopLabel) ontopLabel.textContent = s.alwaysOnTop ? 'On' : 'Off'
+    const trayLabel = $('#s-start-in-tray-label')
+    if (trayLabel) trayLabel.textContent = s.startInTray ? 'On' : 'Off'
   }
 
   /* =============================================
@@ -159,34 +177,34 @@
 
       if (rErr) throw rErr
 
-      // Build spouse map: member_id -> spouse_name
+      // Build spouse map: member_id -> { ids: number[], names: string[] }
       const spouseMap = {}
       if (rels) {
-        // Collect all spouse pairings
         for (const r of rels) {
           if (r.relationship_type === 'spouse') {
             const a = r.member_id
             const b = r.related_member_id
-            if (!spouseMap[a]) spouseMap[a] = []
-            spouseMap[a].push(b)
+            if (!spouseMap[a]) spouseMap[a] = { ids: [], names: [] }
+            spouseMap[a].ids.push(b)
           }
         }
-        // Resolve spouse names
         for (const id of Object.keys(spouseMap)) {
-          const spouseIds = spouseMap[id]
-          const names = spouseIds.map(sid => {
+          spouseMap[id].names = spouseMap[id].ids.map(sid => {
             const m = members ? members.find(mm => mm.id === sid) : null
             return m ? fullName(m) : null
           }).filter(Boolean)
-          spouseMap[id] = names[0] || ''
         }
       }
 
-      // Enrich members with spouse_name
-      events = (members || []).map(m => ({
-        ...m,
-        spouse_name: spouseMap[m.id] || null,
-      }))
+      // Enrich members with spouse_name and spouse_ids
+      events = (members || []).map(m => {
+        const sd = spouseMap[m.id]
+        return {
+          ...m,
+          spouse_name: sd && sd.names[0] ? sd.names[0] : null,
+          spouse_ids: sd ? sd.ids : [],
+        }
+      })
 
       buildList()
       if ($('#view-calendar').classList.contains('active')) buildCalendar()
@@ -317,8 +335,23 @@
           const day = ann.getDate()
           if (!eventsByDay[day]) eventsByDay[day] = []
           const displayName = m.spouse_name ? name + ' & ' + m.spouse_name : name
-          // Deduplicate same-couple anniversaries
-          if (!m.spouse_name || !eventsByDay[day].some(e => e.type === 'anniversary' && e.name.includes(m.spouse_name))) {
+          // Deduplicate same-couple anniversaries by member ID
+          const spouseIds = m.spouse_ids || []
+          if (spouseIds.length > 0) {
+            let alreadyAdded = false
+            for (const existing of eventsByDay[day]) {
+              if (existing.type === 'anniversary' && existing._memberIds) {
+                if (existing._memberIds.has(m.id) || spouseIds.some(sid => existing._memberIds.has(sid))) {
+                  alreadyAdded = true
+                  break
+                }
+              }
+            }
+            if (!alreadyAdded) {
+              const memberIds = new Set([m.id, ...spouseIds])
+              eventsByDay[day].push({ type: 'anniversary', name: displayName, _memberIds: memberIds })
+            }
+          } else {
             eventsByDay[day].push({ type: 'anniversary', name: displayName })
           }
         }
@@ -415,6 +448,7 @@
       theme: $('#s-theme-input').value,
       autoStart: $('#s-auto-start').checked,
       alwaysOnTop: $('#s-always-on-top').checked,
+      startInTray: $('#s-start-in-tray').checked,
     }
   }
 
@@ -479,19 +513,50 @@
   })
 
   document.addEventListener('mouseup', () => {
-    if (isDragging || isResizing) {
-      try {
-        window.electronAPI.saveSettings({
-          width: window.innerWidth,
-          height: window.innerHeight,
-          x: window.screenX,
-          y: window.screenY,
-        })
-      } catch {}
-    }
     isDragging = false
     isResizing = false
   })
+
+  /* =============================================
+     UPDATE NOTIFICATION
+     ============================================= */
+  function showUpdateNotification(version, downloadUrl) {
+    const notif = $('#update-notification')
+    const verEl = $('#update-version')
+    const installBtn = $('#update-install')
+    const remindBtn = $('#update-remind')
+    if (!notif || !verEl || !installBtn || !remindBtn) return
+    verEl.textContent = 'v' + version
+    notif.classList.remove('hidden')
+    installBtn.disabled = false
+    installBtn.textContent = 'Install'
+
+    installBtn.onclick = async function () {
+      installBtn.disabled = true
+      installBtn.textContent = 'Downloading...'
+      try {
+        await window.electronAPI.downloadAndInstallUpdate(downloadUrl)
+      } catch {
+        installBtn.disabled = false
+        installBtn.textContent = 'Install'
+      }
+    }
+    remindBtn.onclick = function () {
+      settings.updateSnooze = Date.now() + 86400000
+      window.electronAPI.saveSettings({ updateSnooze: settings.updateSnooze })
+      notif.classList.add('hidden')
+    }
+  }
+
+  async function checkForUpdate() {
+    if (settings.updateSnooze && Date.now() < settings.updateSnooze) return
+    try {
+      const result = await window.electronAPI.checkForUpdate()
+      if (result && result.available && result.downloadUrl) {
+        showUpdateNotification(result.version, result.downloadUrl)
+      }
+    } catch {}
+  }
 
   /* =============================================
      INIT
@@ -504,7 +569,7 @@
       width: 340, height: 480, fontSize: 14,
       fontFamily: 'Segoe UI, sans-serif', bgColor: '#2d2d2d',
       bgOpacity: 0.92, textOpacity: 1, theme: 'dark',
-      view: 'list', autoStart: false, alwaysOnTop: true,
+      view: 'list', autoStart: false, alwaysOnTop: true, startInTray: false,
     }
 
     applySettings(settings)
@@ -569,6 +634,11 @@
       applySettings(s)
       window.electronAPI.saveSettings(s)
     })
+    $('#s-start-in-tray').addEventListener('input', () => {
+      const s = collectSettingsFromUI()
+      applySettings(s)
+      window.electronAPI.saveSettings(s)
+    })
 
     // Font picker
     const fontInput = $('#s-font-family')
@@ -628,6 +698,9 @@
 
     // Refresh weekly
     setInterval(fetchEvents, 7 * 24 * 60 * 60 * 1000)
+
+    // Check for updates (silent)
+    checkForUpdate()
   }
 
   document.addEventListener('DOMContentLoaded', () => {

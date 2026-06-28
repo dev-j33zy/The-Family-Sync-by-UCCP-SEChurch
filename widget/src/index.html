@@ -132,7 +132,26 @@
             <span id="s-always-on-top-label">On</span>
           </label>
         </div>
+        <div class="settings-group">
+          <label>Start in System Tray</label>
+          <label class="toggle-label">
+            <input type="checkbox" id="s-start-in-tray">
+            <span class="toggle-slider"></span>
+            <span id="s-start-in-tray-label">Off</span>
+          </label>
+        </div>
         <button id="btn-settings-close" class="btn-primary">Done</button>
+      </div>
+    </div>
+
+    <!-- Update Notification -->
+    <div id="update-notification" class="hidden">
+      <div id="update-content">
+        <div id="update-text">Update available: <span id="update-version"></span></div>
+        <div id="update-actions">
+          <button id="update-install">Install</button>
+          <button id="update-remind">Remind Later</button>
+        </div>
       </div>
     </div>
 

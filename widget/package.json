@@ -1,14 +1,11 @@
 {
   "name": "family-sync-widget",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Desktop widget showing upcoming birthdays and anniversaries from The Family Sync",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win portable"
-  },
-  "dependencies": {
-    "electron-store": "^8.2.0"
   },
   "devDependencies": {
     "electron": "^33.0.0",

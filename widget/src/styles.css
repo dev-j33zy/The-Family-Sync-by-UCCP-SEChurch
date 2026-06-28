@@ -629,6 +629,70 @@ body {
 .btn-primary:hover { filter: brightness(1.15); }
 
 /* =============================================
+   UPDATE NOTIFICATION
+   ============================================= */
+#update-notification {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--accent);
+  padding: 8px 10px;
+  z-index: 60;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.3);
+}
+
+#update-notification.hidden { display: none; }
+
+#update-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#update-text {
+  font-size: calc(var(--font-size) * 0.79);
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#update-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+#update-actions button {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: calc(var(--font-size) * 0.71);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#update-actions button:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+#update-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-secondary);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+/* =============================================
    RESIZE HANDLE
    ============================================= */
 #resize-handle {

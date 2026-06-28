@@ -7,4 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSettingsUpdated: (callback) => {
     ipcRenderer.on('settings-updated', (_, settings) => callback(settings))
   },
+  checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
+  downloadAndInstallUpdate: (url) => ipcRenderer.invoke('download-and-install-update', url),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
 })
