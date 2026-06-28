@@ -160,7 +160,7 @@ ipcMain.handle('save-settings', (_, settings) => {
 
 ipcMain.handle('get-env', () => ({
   url: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  key: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
 }))
 
 app.whenReady().then(createWindow)

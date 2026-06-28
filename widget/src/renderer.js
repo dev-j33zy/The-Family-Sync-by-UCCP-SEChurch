@@ -144,6 +144,10 @@
       const { createClient } = window.supabase
       const supabase = createClient(env.url, env.key)
 
+      // Sign in anonymously to satisfy RLS authenticated policies
+      const { error: authErr } = await supabase.auth.signInAnonymously()
+      if (authErr) throw authErr
+
       // Fetch members with upcoming-event-relevant fields
       const { data: members, error: mErr } = await supabase
         .from('members')
