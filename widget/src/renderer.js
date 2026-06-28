@@ -64,7 +64,7 @@
     if (bgRgb) {
       const bgWithOpacity = rgbToStr(bgRgb[0], bgRgb[1], bgRgb[2], bgOp)
       app.style.background = bgWithOpacity
-      // Keep --bg fully opaque for child elements (dropdowns, list items, panels, etc.)
+      app.style.setProperty('--bg-opaque', bgWithOpacity)
       app.style.setProperty('--bg', bg)
       // Compute --bg-secondary from the user's bg color for all themes
       const lum = getLuminance(bg)

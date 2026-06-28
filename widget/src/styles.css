@@ -474,11 +474,12 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--bg);
+  background: var(--bg-opaque);
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow-y: auto;
   z-index: 30;
 }
 
