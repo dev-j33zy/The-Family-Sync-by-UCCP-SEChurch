@@ -289,8 +289,19 @@ ipcMain.handle('download-and-install-update', (_, downloadUrl) => {
     const exeName = path.basename(currentExe)
 
     const file = fs.createWriteStream(tempExe)
-    https.get(downloadUrl, (res) => {
+    const req = https.get(downloadUrl, (res) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        file.close()
+        fs.unlink(tempExe, () => {})
+        reject(new Error('Download failed with HTTP ' + res.statusCode))
+        return
+      }
       res.pipe(file)
+      res.on('error', (err) => {
+        file.close()
+        fs.unlink(tempExe, () => {})
+        reject(err)
+      })
       file.on('finish', () => {
         file.close(() => {
           const scriptPath = path.join(tempDir, 'update-widget.bat')
@@ -308,14 +319,18 @@ ipcMain.handle('download-and-install-update', (_, downloadUrl) => {
             'del "%~f0"',
           ]
           fs.writeFileSync(scriptPath, lines.join('\r\n'))
-          exec('start "" "' + scriptPath + '"', () => {})
+          exec('start "" "' + scriptPath + '"', () => {
+            setTimeout(() => app.quit(), 500)
+          })
           resolve({ success: true })
         })
       })
-    }).on('error', (err) => {
+    })
+    req.on('error', (err) => {
       fs.unlink(tempExe, () => {})
       reject(err)
     })
+    req.end()
   })
 })
 
