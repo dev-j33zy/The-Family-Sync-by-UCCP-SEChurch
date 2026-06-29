@@ -6,7 +6,8 @@
   "scripts": {
     "start": "electron .",
     "generate-icons": "node scripts/generate-icons.js",
-    "build": "npm run generate-icons && electron-builder --win portable"
+    "build": "npm run generate-icons && electron-builder --win nsis",
+    "build:portable": "npm run generate-icons && electron-builder --win portable"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -18,8 +19,19 @@
     "productName": "Family Sync Widget",
     "icon": "assets/icon-256.png",
     "win": {
-      "target": "portable",
+      "target": "nsis",
       "icon": "assets/icon-256.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "shortcutName": "Family Sync Widget",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }

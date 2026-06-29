@@ -58,6 +58,7 @@ function applyAutoStart(enabled) {
   app.setLoginItemSettings({
     openAtLogin: enabled,
     path: process.execPath,
+    args: process.argv.slice(1),
   })
 }
 
