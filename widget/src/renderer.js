@@ -709,6 +709,13 @@
       window.electronAPI.onSettingsUpdated((s) => applySettings(s))
     }
 
+    // App version
+    try {
+      var ver = await window.electronAPI.getAppVersion()
+      var verEl = $('#settings-version')
+      if (verEl) verEl.textContent = 'v' + ver
+    } catch {}
+
     // Drag & Resize
     initDrag()
     initResize()

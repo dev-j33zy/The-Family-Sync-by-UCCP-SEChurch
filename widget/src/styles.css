@@ -476,11 +476,20 @@ body {
   bottom: 0;
   background: var(--bg-opaque);
   padding: 16px;
+  padding-bottom: 60px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
   z-index: 30;
+}
+
+#settings-version {
+  margin-top: 4px;
+  text-align: center;
+  font-size: calc(var(--font-size) * 0.6);
+  opacity: 0.35;
+  font-weight: 400;
 }
 
 #settings-panel.hidden { display: none; }

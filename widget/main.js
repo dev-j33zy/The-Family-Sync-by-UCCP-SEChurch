@@ -337,6 +337,8 @@ ipcMain.handle('download-and-install-update', (_, downloadUrl) => {
   })
 })
 
+ipcMain.handle('get-app-version', () => require('./package.json').version)
+
 ipcMain.handle('open-external', (_, url) => {
   shell.openExternal(url)
 })
