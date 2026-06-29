@@ -530,7 +530,7 @@
     const installBtn = $('#update-install')
     const remindBtn = $('#update-remind')
     if (!notif || !verEl || !installBtn || !remindBtn) return
-    verEl.textContent = 'v' + version
+    verEl.textContent = 'Update v' + version + ' available'
     notif.classList.remove('hidden')
     installBtn.disabled = false
     installBtn.textContent = 'Install'
@@ -569,7 +569,7 @@
     const remindBtn = $('#update-remind')
     if (!notif || !verEl || !installBtn || !remindBtn) return
 
-    verEl.textContent = 'Checking...'
+    verEl.textContent = 'Checking for updates...'
     installBtn.disabled = true
     installBtn.textContent = '...'
     remindBtn.style.display = 'none'
@@ -581,14 +581,14 @@
         remindBtn.style.display = ''
         showUpdateNotification(result.version, result.downloadUrl)
       } else {
-        verEl.textContent = 'Up to date'
+        verEl.textContent = 'No update available'
         installBtn.textContent = 'OK'
         installBtn.disabled = false
         remindBtn.style.display = 'none'
         installBtn.onclick = function () { notif.classList.add('hidden') }
       }
     } catch {
-      verEl.textContent = 'Check failed'
+      verEl.textContent = 'Update check failed'
       installBtn.textContent = 'OK'
       installBtn.disabled = false
       remindBtn.style.display = 'none'
