@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage, net } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const https = require('https')
@@ -289,7 +289,8 @@ ipcMain.handle('download-and-install-update', (_, downloadUrl) => {
     const exeName = path.basename(currentExe)
 
     const file = fs.createWriteStream(tempExe)
-    const req = https.get(downloadUrl, (res) => {
+    const req = net.request(downloadUrl)
+    req.on('response', (res) => {
       if (res.statusCode < 200 || res.statusCode >= 300) {
         file.close()
         fs.unlink(tempExe, () => {})
