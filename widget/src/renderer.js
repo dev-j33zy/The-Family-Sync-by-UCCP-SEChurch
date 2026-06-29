@@ -562,6 +562,40 @@
     } catch {}
   }
 
+  async function forceCheckForUpdate() {
+    const notif = $('#update-notification')
+    const verEl = $('#update-version')
+    const installBtn = $('#update-install')
+    const remindBtn = $('#update-remind')
+    if (!notif || !verEl || !installBtn || !remindBtn) return
+
+    verEl.textContent = 'Checking...'
+    installBtn.disabled = true
+    installBtn.textContent = '...'
+    remindBtn.style.display = 'none'
+    notif.classList.remove('hidden')
+
+    try {
+      const result = await window.electronAPI.checkForUpdate()
+      if (result && result.available && result.downloadUrl) {
+        remindBtn.style.display = ''
+        showUpdateNotification(result.version, result.downloadUrl)
+      } else {
+        verEl.textContent = 'Up to date'
+        installBtn.textContent = 'OK'
+        installBtn.disabled = false
+        remindBtn.style.display = 'none'
+        installBtn.onclick = function () { notif.classList.add('hidden') }
+      }
+    } catch {
+      verEl.textContent = 'Check failed'
+      installBtn.textContent = 'OK'
+      installBtn.disabled = false
+      remindBtn.style.display = 'none'
+      installBtn.onclick = function () { notif.classList.add('hidden') }
+    }
+  }
+
   /* =============================================
      INIT
      ============================================= */
@@ -621,6 +655,7 @@
     $('#btn-dots').addEventListener('click', (e) => { e.stopPropagation(); toggleMenu() })
     $('#dropdown-settings').addEventListener('click', () => { hideMenu(); showSettings() })
     $('#dropdown-refresh').addEventListener('click', () => { hideMenu(); fetchEvents() })
+    $('#dropdown-check-update').addEventListener('click', () => { hideMenu(); forceCheckForUpdate() })
     $('#dropdown-close').addEventListener('click', () => { hideMenu(); window.close() })
 
     // Close menu on outside click

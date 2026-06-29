@@ -247,7 +247,7 @@ function compareSemver(a, b) {
 ipcMain.handle('check-for-update', () => {
   return new Promise((resolve) => {
     const req = https.get('https://api.github.com/repos/dev-j33zy/The-Family-Sync-by-UCCP-SEChurch/releases/latest', {
-      headers: { 'User-Agent': 'family-sync-widget', Accept: 'application/vnd.github.v3+json' },
+      headers: { 'User-Agent': 'family-sync-widget', Accept: 'application/vnd.github.v3+json', ...(process.env.GITHUB_TOKEN ? { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}) },
     }, (res) => {
       let data = ''
       res.on('data', chunk => { data += chunk })
