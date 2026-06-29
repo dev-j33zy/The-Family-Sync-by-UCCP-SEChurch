@@ -305,7 +305,8 @@ ipcMain.handle('download-and-install-update', (_, downloadUrl) => {
       file.on('finish', () => {
         file.close(() => {
           const scriptPath = path.join(tempDir, 'update-widget.bat')
-          const lines = [
+          var psSafeExe = currentExe.replace(/'/g, "''")
+          var lines = [
             '@echo off',
             'setlocal',
             ':wait',
@@ -315,6 +316,7 @@ ipcMain.handle('download-and-install-update', (_, downloadUrl) => {
             '  goto wait',
             ')',
             'copy /Y "' + tempExe + '" "' + currentExe + '"',
+            'powershell -Command "Remove-Item -LiteralPath \'' + psSafeExe + "' -Stream Zone.Identifier -ErrorAction SilentlyContinue\" 2>NUL",
             'start "" "' + currentExe + '"',
             'del "%~f0"',
           ]

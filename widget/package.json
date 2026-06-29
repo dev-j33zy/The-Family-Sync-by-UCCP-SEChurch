@@ -1,6 +1,6 @@
 {
   "name": "family-sync-widget",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Desktop widget showing upcoming birthdays and anniversaries from The Family Sync",
   "main": "main.js",
   "scripts": {
