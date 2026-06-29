@@ -319,13 +319,11 @@ ipcMain.handle('download-and-install-update', (_, downloadUrl) => {
             'copy /Y "' + tempExe + '" "' + currentExe + '"',
             'powershell -Command "Remove-Item -LiteralPath \'' + psSafeExe + "' -Stream Zone.Identifier -ErrorAction SilentlyContinue\" 2>NUL",
             'start "" "' + currentExe + '"',
-            'del "%~f0"',
           ]
           fs.writeFileSync(scriptPath, lines.join('\r\n'))
-          exec('start "" "' + scriptPath + '"', () => {
-            setTimeout(() => app.quit(), 500)
-          })
+          exec('start "" "' + scriptPath + '"')
           resolve({ success: true })
+          setTimeout(() => app.quit(), 1000)
         })
       })
     })
