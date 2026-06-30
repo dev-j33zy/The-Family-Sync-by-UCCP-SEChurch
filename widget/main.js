@@ -55,11 +55,33 @@ function getDefaultSettings() {
 }
 
 function applyAutoStart(enabled) {
-  app.setLoginItemSettings({
-    openAtLogin: enabled,
-    path: process.execPath,
-    args: process.argv.slice(1),
-  })
+  // Always clear first to remove any stale entries (e.g. from dev runs)
+  app.setLoginItemSettings({ openAtLogin: false })
+  if (enabled) {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      path: process.execPath,
+      args: process.argv.slice(1),
+    })
+  }
+}
+
+function cleanStaleAutoStart() {
+  if (process.platform !== 'win32') return
+  try {
+    const { execSync } = require('child_process')
+    const key = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'
+    const out = execSync(`reg query "${key}"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
+    for (const line of out.split(/\r?\n/)) {
+      const m = line.match(/^\s*(\S[\s\S]*?\S)\s+REG_\S+\s+(.*)$/)
+      if (!m) continue
+      const cmd = m[2].trim()
+      if (cmd.toLowerCase().includes('electron.exe')) {
+        const name = m[1].trim()
+        execSync(`reg delete "${key}" /V "${name}" /F`, { stdio: 'ignore' })
+      }
+    }
+  } catch {}
 }
 
 let mainWindow = null
@@ -108,9 +130,18 @@ function toggleMainWindow() {
 }
 
 function createWindow() {
+  cleanStaleAutoStart()
+
   const settings = loadSettings()
   const display = screen.getPrimaryDisplay().workAreaSize
   const startInTray = settings.startInTray
+
+  // One-time migration: force-disable auto-start at Windows login
+  if (settings._autoStartMigrated === undefined) {
+    settings.autoStart = false
+    settings._autoStartMigrated = true
+    saveSettings(settings)
+  }
 
   const winSettings = {
     width: Math.min(settings.width, display.width),
@@ -171,6 +202,11 @@ function createWindow() {
       })
     }, 400)
   })
+
+  // Prevent DevTools in production (avoids blank "electron.exe" dev windows)
+  if (app.isPackaged) {
+    mainWindow.webContents.on('devtools-opened', () => mainWindow.webContents.closeDevTools())
+  }
 
   mainWindow.on('close', (e) => {
     if (tray && !app.isQuitting) {
