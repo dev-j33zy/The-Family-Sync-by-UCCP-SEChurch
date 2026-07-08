@@ -10,7 +10,7 @@ export async function GET(request) {
     }
 
     const adminSupabase = createAdminSupabaseClient()
-    const { data, error } = await adminSupabase.auth.admin.listUsers()
+    const { data, error } = await adminSupabase.auth.admin.listUsers({ perPage: 1000 })
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }

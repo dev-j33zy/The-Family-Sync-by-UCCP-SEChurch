@@ -61,7 +61,6 @@ export default function CreateUserPage() {
     setMessage(null)
     setError(null)
     setCreatedUser(null)
-    setInviteLink(null)
 
     try {
       const res = await fetch('/api/admin/create-user', {
