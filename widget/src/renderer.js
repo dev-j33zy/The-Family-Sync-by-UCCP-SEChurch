@@ -3,6 +3,8 @@
 
   let settings = {}
   let events = []
+  let auth = { signedIn: false, email: null }
+  let lastFetchAt = 0
   let calMonth = new Date().getMonth()
   let calYear = new Date().getFullYear()
 
@@ -144,82 +146,125 @@
     loading: '<svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7" stroke-dasharray="30 14" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 10 10" to="360 10 10" dur="0.8s" repeatCount="indefinite"/></circle></svg>',
     error: '<svg viewBox="0 0 18 18" width="18" height="18" fill="currentColor"><path d="M9 1a8 8 0 100 16A8 8 0 009 1zM8 5h2v5H8V5zm0 6h2v2H8v-2z"/></svg>',
     empty: '<svg viewBox="-3 -3 34 34" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"><g transform="rotate(12 14 14)"><path d="M14 4l11 23H3z"/><circle cx="14" cy="4" r="4" fill="currentColor" stroke="none"/><path d="M4 24c3 1.5 6 1.5 10 0s6 1.5 10 0"/></g></svg>',
+    lock: '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 118 0v3"/></svg>',
   }
 
   /* =============================================
-     FETCH EVENTS (members + relationships)
+     SIGN-IN STATE
+     ============================================= */
+  function errorText(err) {
+    return String((err && err.message) || err || 'Unknown error')
+      .replace(/^Error invoking remote method '[^']+':\s*/, '')
+      .replace(/^Error:\s*/, '')
+  }
+
+  function updateAuthUI() {
+    const item = $('#dropdown-login')
+    if (!item) return
+    item.innerHTML = auth.signedIn
+      ? '&#128100; Sign out' + (auth.email ? ' (' + escHtml(auth.email) + ')' : '')
+      : '&#128100; Sign in'
+  }
+
+  async function refreshAuth() {
+    try {
+      auth = await window.electronAPI.authStatus()
+    } catch {
+      auth = { signedIn: false, email: null }
+    }
+    updateAuthUI()
+  }
+
+  function showLogin() {
+    if (!$('#settings-panel').classList.contains('hidden')) {
+      $('#settings-panel').classList.add('hidden')
+    }
+    $$('.view').forEach(v => v.classList.remove('active'))
+    $('#view-tabs').classList.add('hidden')
+    $('#login-panel').classList.remove('hidden')
+
+    const errEl = $('#login-error')
+    if (errEl) {
+      errEl.textContent = ''
+      errEl.classList.add('hidden')
+    }
+    const pwd = $('#login-password')
+    if (pwd) pwd.value = ''
+    const email = $('#login-email')
+    if (email) setTimeout(() => email.focus(), 0)
+  }
+
+  function hideLogin() {
+    $('#login-panel').classList.add('hidden')
+    $('#view-tabs').classList.remove('hidden')
+    const activeTab = $('.tab.active')
+    if (activeTab) {
+      const view = document.getElementById('view-' + activeTab.dataset.view)
+      if (view) view.classList.add('active')
+    }
+  }
+
+  function renderSignedOut() {
+    const markup =
+      '<div class="empty-state"><div class="empty-state-icon">' + SVGS.lock + '</div>' +
+      '<div>Sign in to see birthdays and anniversaries</div>' +
+      '<button type="button" class="btn-link btn-signin-inline">Sign in</button></div>'
+
+    for (const sel of ['#events-list', '#calendar-grid']) {
+      const el = $(sel)
+      if (el) el.innerHTML = markup
+    }
+    $$('.btn-signin-inline').forEach(btn => btn.addEventListener('click', showLogin))
+  }
+
+  /* =============================================
+     FETCH EVENTS (signed-in widget endpoint)
      ============================================= */
   async function fetchEvents() {
+    lastFetchAt = Date.now()
     const container = $('#events-list')
-    if (container) {
+    if (container && events.length === 0) {
       container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + SVGS.loading + '</div><div>Loading...</div></div>'
     }
 
     try {
-      const env = await window.electronAPI.getEnv()
-      if (!env.url || !env.key) throw new Error('Missing Supabase credentials')
+      const payload = await window.electronAPI.getEvents()
 
-      const { createClient } = window.supabase
-      const supabase = createClient(env.url, env.key)
-
-      // Sign in anonymously to satisfy RLS authenticated policies
-      const { error: authErr } = await supabase.auth.signInAnonymously()
-      if (authErr) throw authErr
-
-      // Fetch members with upcoming-event-relevant fields
-      const { data: members, error: mErr } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, date_of_birth, wedding_anniversary, relationship_status')
-        .limit(1000)
-
-      if (mErr) throw mErr
-
-      // Fetch relationships to build spouse map
-      const { data: rels, error: rErr } = await supabase
-        .from('relationships')
-        .select('member_id, related_member_id, relationship_type')
-
-      if (rErr) throw rErr
-
-      // Build spouse map: member_id -> { ids: number[], names: string[] }
-      const spouseMap = {}
-      if (rels) {
-        for (const r of rels) {
-          if (r.relationship_type === 'spouse') {
-            const a = r.member_id
-            const b = r.related_member_id
-            if (!spouseMap[a]) spouseMap[a] = { ids: [], names: [] }
-            spouseMap[a].ids.push(b)
-          }
-        }
-        for (const id of Object.keys(spouseMap)) {
-          spouseMap[id].names = spouseMap[id].ids.map(sid => {
-            const m = members ? members.find(mm => mm.id === sid) : null
-            return m ? fullName(m) : null
-          }).filter(Boolean)
-        }
+      if (payload && payload.unauthorized) {
+        events = []
+        auth = { signedIn: false, email: null }
+        updateAuthUI()
+        renderSignedOut()
+        return
       }
 
-      // Enrich members with spouse_name and spouse_ids
-      events = (members || []).map(m => {
-        const sd = spouseMap[m.id]
-        return {
-          ...m,
-          spouse_name: sd && sd.names[0] ? sd.names[0] : null,
-          spouse_ids: sd ? sd.ids : [],
-        }
-      })
+      events = (payload && payload.members) || []
 
       buildList()
       if ($('#view-calendar').classList.contains('active')) buildCalendar()
     } catch (err) {
       console.error('Fetch error:', err)
+      // Keep the last good data on a transient failure; the next poll retries.
+      if (events.length > 0) return
       const container = $('#events-list')
       if (container) {
         container.innerHTML =
-          '<div class="empty-state"><div class="empty-state-icon">' + SVGS.error + '</div><div>Failed to load data</div></div>'
+          '<div class="empty-state"><div class="empty-state-icon">' + SVGS.error + '</div><div>Failed to load data</div>' +
+          '<div style="font-size:10px;opacity:0.6;margin-top:4px">' + escHtml(errorText(err)) + '</div></div>'
       }
     }
+  }
+
+  /* =============================================
+     REFRESH THROTTLE
+     The web app is the source of truth, so poll it regularly and also
+     refresh when the widget is reopened. Skip bursts of focus/show events.
+     ============================================= */
+  const FETCH_COOLDOWN_MS = 60 * 1000
+
+  async function refreshEvents(force) {
+    if (!force && Date.now() - lastFetchAt < FETCH_COOLDOWN_MS) return
+    await fetchEvents()
   }
 
   /* =============================================
@@ -427,6 +472,9 @@
      SETTINGS PANEL — own page (hides views)
      ============================================= */
   function showSettings() {
+    if (!$('#login-panel').classList.contains('hidden')) {
+      $('#login-panel').classList.add('hidden')
+    }
     $$('.view').forEach(v => v.classList.remove('active'))
     $('#view-tabs').classList.add('hidden')
     $('#settings-panel').classList.remove('hidden')
@@ -603,9 +651,49 @@
 
     // Dots menu
     $('#btn-dots').addEventListener('click', (e) => { e.stopPropagation(); toggleMenu() })
+    $('#dropdown-login').addEventListener('click', async () => {
+      hideMenu()
+      if (auth.signedIn) {
+        try { await window.electronAPI.logout() } catch {}
+        auth = { signedIn: false, email: null }
+        updateAuthUI()
+        await fetchEvents()
+      } else {
+        showLogin()
+      }
+    })
     $('#dropdown-settings').addEventListener('click', () => { hideMenu(); showSettings() })
-    $('#dropdown-refresh').addEventListener('click', () => { hideMenu(); fetchEvents() })
+    $('#dropdown-refresh').addEventListener('click', () => { hideMenu(); refreshEvents(true) })
     $('#dropdown-close').addEventListener('click', () => { hideMenu(); window.close() })
+
+    // Sign-in panel
+    $('#login-panel').addEventListener('submit', async (e) => {
+      e.preventDefault()
+
+      const errEl = $('#login-error')
+      const submit = $('#btn-login-submit')
+      const email = $('#login-email').value.trim()
+      const password = $('#login-password').value
+
+      errEl.textContent = ''
+      errEl.classList.add('hidden')
+      submit.disabled = true
+      submit.textContent = 'Signing in...'
+
+      try {
+        await window.electronAPI.login({ email, password })
+        await refreshAuth()
+        hideLogin()
+        await fetchEvents()
+      } catch (err) {
+        errEl.textContent = errorText(err)
+        errEl.classList.remove('hidden')
+      } finally {
+        submit.disabled = false
+        submit.textContent = 'Sign in'
+      }
+    })
+    $('#btn-login-cancel').addEventListener('click', () => { hideLogin(); fetchEvents() })
 
     // Close menu on outside click
     document.addEventListener('click', (e) => {
@@ -693,24 +781,25 @@
       window.electronAPI.onSettingsUpdated((s) => applySettings(s))
     }
 
+    // Refresh whenever the widget is reopened or focused
+    if (window.electronAPI.onRefreshRequested) {
+      window.electronAPI.onRefreshRequested(() => refreshEvents(false))
+    }
+
     // Drag & Resize
     initDrag()
     initResize()
 
-    // Fetch events
-    fetchEvents()
+    // Fetch events (check the stored session first)
+    await refreshAuth()
+    refreshEvents(true)
 
-    // Refresh weekly
-    setInterval(fetchEvents, 7 * 24 * 60 * 60 * 1000)
+    // Poll so members added in the web app show up while the widget is open
+    setInterval(() => refreshEvents(false), 5 * 60 * 1000)
 
     // Check for updates (silent)
     checkForUpdate()
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const script = document.createElement('script')
-    script.src = 'https://unpkg.com/@supabase/supabase-js@2'
-    script.onload = init
-    document.head.appendChild(script)
-  })
+  document.addEventListener('DOMContentLoaded', init)
 })()

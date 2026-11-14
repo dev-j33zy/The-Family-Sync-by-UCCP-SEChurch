@@ -18,6 +18,7 @@
         <div id="menu-dots" class="dropdown">
           <button id="btn-dots" class="tb-btn" title="Menu">&ctdot;</button>
           <div id="dropdown-menu" class="dropdown-content hidden">
+            <button id="dropdown-login">&#128100; Sign in</button>
             <button id="dropdown-settings">&#9881; Settings</button>
             <button id="dropdown-refresh">&#8635; Refresh</button>
             <hr>
@@ -66,6 +67,23 @@
         <div id="calendar-grid"></div>
         <div id="calendar-tooltip-area" class="hidden"></div>
       </div>
+
+      <!-- Sign-in Panel (above everything including tabs) -->
+      <form id="login-panel" class="hidden">
+        <div id="login-title">Sign in</div>
+        <div id="login-subtitle">Use the same account you use in the Family Sync app.</div>
+        <div class="settings-group">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" class="text-input" autocomplete="username" spellcheck="false" required>
+        </div>
+        <div class="settings-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" class="text-input" autocomplete="current-password" required>
+        </div>
+        <div id="login-error" class="hidden"></div>
+        <button type="submit" id="btn-login-submit" class="btn-primary">Sign in</button>
+        <button type="button" id="btn-login-cancel" class="btn-secondary">Cancel</button>
+      </form>
 
       <!-- Settings Panel (above everything including tabs) -->
       <div id="settings-panel" class="hidden">

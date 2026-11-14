@@ -1,11 +1,22 @@
-const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage, safeStorage } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const https = require('https')
 const { exec } = require('child_process')
 
-const envPath = path.join(__dirname, '.env')
-if (fs.existsSync(envPath)) {
+// Look for .env next to the portable exe first (electron-builder sets
+// PORTABLE_EXECUTABLE_DIR), then next to an installed exe, then in the app
+// folder during development.
+const envPaths = [
+  process.env.PORTABLE_EXECUTABLE_DIR
+    ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, '.env')
+    : null,
+  path.join(path.dirname(process.execPath), '.env'),
+  path.join(__dirname, '.env'),
+].filter(Boolean)
+
+for (const envPath of envPaths) {
+  if (!fs.existsSync(envPath)) continue
   const lines = fs.readFileSync(envPath, 'utf8').split('\n')
   for (const line of lines) {
     const trimmed = line.trim()
@@ -14,8 +25,10 @@ if (fs.existsSync(envPath)) {
     if (eq === -1) continue
     const key = trimmed.slice(0, eq).trim()
     const val = trimmed.slice(eq + 1).trim()
-    process.env[key] = val
+    // Real environment variables win over the file.
+    if (process.env[key] === undefined) process.env[key] = val
   }
+  break
 }
 
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'widget-settings.json')
@@ -139,6 +152,19 @@ function createWindow() {
   mainWindow = new BrowserWindow(winSettings)
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'))
 
+  // Ask the renderer to reload data whenever the widget is reopened or focused,
+  // so changes made in the web app show up without waiting for the timer.
+  let rendererReady = false
+  mainWindow.webContents.on('did-finish-load', () => { rendererReady = true })
+  const requestRefresh = () => {
+    if (rendererReady && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('refresh-events')
+    }
+  }
+  mainWindow.on('show', requestRefresh)
+  mainWindow.on('focus', requestRefresh)
+  mainWindow.on('restore', requestRefresh)
+
   applyAutoStart(!!settings.autoStart)
 
   if (startInTray) {
@@ -229,10 +255,129 @@ ipcMain.handle('save-settings', (_, settings) => {
   return merged
 })
 
-ipcMain.handle('get-env', () => ({
-  url: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-}))
+/* =============================================
+   SIGN-IN (against the Family Sync app)
+   ============================================= */
+
+const AUTH_PATH = path.join(app.getPath('userData'), 'widget-auth.json')
+const SESSION_COOKIE = 'fsync_session'
+
+function appUrl() {
+  const raw = (process.env.WIDGET_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim()
+  if (!raw) throw new Error('WIDGET_APP_URL is not set. Add it to the widget .env.')
+  return raw.replace(/\/+$/, '')
+}
+
+function readAuth() {
+  try {
+    const stored = JSON.parse(fs.readFileSync(AUTH_PATH, 'utf8'))
+    if (!stored || !stored.token) return null
+    const token = stored.encrypted
+      ? safeStorage.decryptString(Buffer.from(stored.token, 'base64'))
+      : stored.token
+    return { token, email: stored.email || null }
+  } catch {
+    return null
+  }
+}
+
+function writeAuth(auth) {
+  try {
+    if (!auth) {
+      fs.rmSync(AUTH_PATH, { force: true })
+      return
+    }
+    const record = { email: auth.email || null, token: auth.token, encrypted: false }
+    if (safeStorage.isEncryptionAvailable()) {
+      record.token = safeStorage.encryptString(auth.token).toString('base64')
+      record.encrypted = true
+    }
+    fs.writeFileSync(AUTH_PATH, JSON.stringify(record, null, 2))
+  } catch {}
+}
+
+function sessionTokenFrom(response) {
+  const cookies = typeof response.headers.getSetCookie === 'function'
+    ? response.headers.getSetCookie()
+    : [response.headers.get('set-cookie')].filter(Boolean)
+  for (const cookie of cookies) {
+    const pair = String(cookie).split(';')[0]
+    if (pair.startsWith(SESSION_COOKIE + '=')) {
+      return pair.slice(SESSION_COOKIE.length + 1)
+    }
+  }
+  return null
+}
+
+ipcMain.handle('auth-status', () => {
+  const auth = readAuth()
+  return { signedIn: !!auth, email: auth ? auth.email : null }
+})
+
+ipcMain.handle('login', async (_, credentials) => {
+  const email = String((credentials && credentials.email) || '').trim()
+  const password = String((credentials && credentials.password) || '')
+  if (!email || !password) throw new Error('Email and password are required')
+
+  const base = appUrl()
+  let response
+  try {
+    response = await fetch(base + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+  } catch {
+    throw new Error('Could not reach ' + base + '. Is the Family Sync app running?')
+  }
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || 'Sign in failed (' + response.status + ')')
+
+  const token = sessionTokenFrom(response)
+  if (!token) throw new Error('Sign in succeeded but no session was returned')
+
+  const accountEmail = (data.user && data.user.email) || email
+  writeAuth({ token, email: accountEmail })
+  return { email: accountEmail }
+})
+
+ipcMain.handle('logout', async () => {
+  const auth = readAuth()
+  if (auth) {
+    try {
+      await fetch(appUrl() + '/api/auth/logout', {
+        method: 'POST',
+        headers: { Cookie: SESSION_COOKIE + '=' + auth.token },
+      })
+    } catch {}
+  }
+  writeAuth(null)
+  return { signedIn: false }
+})
+
+ipcMain.handle('get-events', async () => {
+  const auth = readAuth()
+  if (!auth) return { unauthorized: true, members: [] }
+
+  let response
+  try {
+    response = await fetch(appUrl() + '/api/widget/events', {
+      headers: { Cookie: SESSION_COOKIE + '=' + auth.token },
+    })
+  } catch {
+    throw new Error('Could not reach the Family Sync app')
+  }
+
+  if (response.status === 401) {
+    writeAuth(null)
+    return { unauthorized: true, members: [] }
+  }
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || 'Failed to load events (' + response.status + ')')
+  return data
+})
 
 function compareSemver(a, b) {
   const pa = a.split('.').map(Number)
@@ -324,6 +469,8 @@ ipcMain.handle('open-external', (_, url) => {
 })
 
 app.isQuitting = false
-app.on('before-quit', () => { app.isQuitting = true })
+app.on('before-quit', () => {
+  app.isQuitting = true
+})
 app.whenReady().then(createWindow)
 app.on('window-all-closed', () => { if (!tray) app.quit() })
