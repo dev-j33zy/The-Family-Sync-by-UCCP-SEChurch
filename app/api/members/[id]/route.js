@@ -1,117 +1,188 @@
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { assignMemberCode } from '@/lib/member-code'
 import { NextResponse } from 'next/server'
+import { oid } from '@/lib/db'
+import { modelsFor } from '@/lib/models'
+import { authUser } from '@/lib/auth'
+import { assignMemberCode } from '@/lib/member-code'
+import { applyMembershipRules, cleanMemberInput } from '@/lib/member-input'
+import { applyMemberPhoto, deleteMemberImage } from '@/lib/images'
+import { serializeMember, serializeRelationship } from '@/lib/serialize'
+
+async function loadRelationships(memberId, { Relationship, Member, FamilyGroup }) {
+  const rels = await Relationship.find({ member_id: memberId })
+    .sort({ created_at: 1 })
+    .lean()
+
+  if (!rels.length) return []
+
+  const relatedIds = rels.map(r => r.related_member_id)
+  const relatedMembers = await Member.find({ _id: { $in: relatedIds } }).lean()
+  const memberById = new Map(relatedMembers.map(m => [String(m._id), m]))
+
+  const groupIds = relatedMembers.map(m => m.family_group_id).filter(Boolean)
+  const groups = groupIds.length
+    ? await FamilyGroup.find({ _id: { $in: groupIds } }).lean()
+    : []
+  const groupById = new Map(groups.map(g => [String(g._id), g]))
+
+  return rels.map(rel => {
+    const related = memberById.get(String(rel.related_member_id))
+    const group = related?.family_group_id
+      ? groupById.get(String(related.family_group_id))
+      : null
+    return serializeRelationship(rel, related, group)
+  })
+}
 
 export async function GET(request, { params }) {
   try {
-    const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data, error } = await supabase
-      .from('members')
-      .select('*, family_groups(id, name)')
-      .eq('id', id)
-      .single()
+    const { Member, Relationship, FamilyGroup } = await modelsFor('members')
 
-    if (error) throw error
-    return NextResponse.json(data)
+    const { id } = await params
+    const memberId = oid(id)
+    if (!memberId) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    const user = await authUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const member = await Member.findById(memberId)
+      .populate('family_group_id', 'name')
+      .lean()
+
+    if (!member) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    const relationships_list = await loadRelationships(memberId, {
+      Member,
+      Relationship,
+      FamilyGroup,
+    })
+
+    return NextResponse.json({
+      ...serializeMember(member),
+      relationships_list,
+    })
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 404 })
+    console.error('member detail error:', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 
 export async function PUT(request, { params }) {
   try {
+    const { Member, Relationship } = await modelsFor('members')
+
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
+    const memberId = oid(id)
+    if (!memberId) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
     const body = await request.json()
 
-    // Strip joined/relation fields that are not actual members columns
-    const MEMBER_COLUMNS = [
-      'first_name', 'last_name', 'middle_name', 'date_of_birth', 'gender', 'citizenship',
-      'relationship_status', 'wedding_anniversary',
-      'communicant_class_graduate',
-      'date_of_membership', 'membership_status', 'membership_type',
-      'phone_number', 'email_address', 'street_address', 'village', 'barangay', 'city', 'family_group_id',
-      'profile_picture',
-    ]
-
-    // Auto-set membership status/type based on date_of_membership
-    if (body.date_of_membership) {
-      if (body.membership_status === 'new') {
-        body.membership_status = 'active'
-      }
-      if (!body.membership_type) {
-        body.membership_type = 'regular'
-      }
-    } else {
-      body.membership_status = 'new'
-      body.membership_type = body.membership_type || null
+    const user = await authUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Clear anniversary if not married
-    if (body.relationship_status !== 'married') {
-      body.wedding_anniversary = null
+    applyMembershipRules(body)
+
+    const { values, photo, error } = cleanMemberInput(body)
+    if (error) return NextResponse.json({ error }, { status: 400 })
+
+    if (!Object.keys(values).length && photo === undefined) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
     }
 
-    // Clean empty strings to null and strip non-column fields
-    const cleaned = Object.fromEntries(
-      Object.entries(body)
-        .filter(([k]) => MEMBER_COLUMNS.includes(k))
-        .map(([k, v]) => [k, v === '' ? null : v])
-    )
+    const existing = await Member.findById(memberId).lean()
+    if (!existing) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
 
-    const { data, error } = await supabase
-      .from('members')
-      .update(cleaned)
-      .eq('id', id)
-      .select()
-      .single()
+    if (Object.keys(values).length) {
+      await Member.findByIdAndUpdate(
+        memberId,
+        { $set: values },
+        { returnDocument: 'after', runValidators: true }
+      )
+    }
 
-    if (error) throw error
+    // Photo uploads/removals live in the images cluster.
+    await applyMemberPhoto(memberId, photo, Member)
 
-    // Regenerate member_code if date_of_membership changed
+    // Re-assign the member code when the membership date changes.
     if ('date_of_membership' in body) {
-      await assignMemberCode(supabase, id)
+      await assignMemberCode(memberId)
     }
 
-    // Sync wedding_anniversary with spouse
-    if ('wedding_anniversary' in body) {
-      const { data: rels } = await supabase
-        .from('relationships')
-        .select('related_member_id')
-        .eq('member_id', id)
-        .eq('relationship_type', 'spouse')
+    // Keep the spouse's anniversary / marital status in sync.
+    if ('wedding_anniversary' in body || 'relationship_status' in body) {
+      const spouses = await Relationship.find({
+        member_id: memberId,
+        relationship_type: 'spouse',
+      }).lean()
 
-      if (rels && rels.length > 0) {
-        const spouseId = rels[0].related_member_id
-        const spouseUpdate = { wedding_anniversary: cleaned.wedding_anniversary }
-        if (cleaned.relationship_status === 'married') {
-          spouseUpdate.relationship_status = 'married'
-        } else if (!cleaned.wedding_anniversary && body.relationship_status !== 'married') {
-          spouseUpdate.relationship_status = 'single'
+      for (const rel of spouses) {
+        const update = {}
+        if ('wedding_anniversary' in body) {
+          update.wedding_anniversary = values.wedding_anniversary ?? null
         }
-        await supabase.from('members').update(spouseUpdate).eq('id', spouseId)
+        if ('relationship_status' in body) {
+          update.relationship_status =
+            body.relationship_status === 'married' ? 'married' : 'single'
+        }
+        if (Object.keys(update).length) {
+          await Member.updateOne({ _id: rel.related_member_id }, { $set: update })
+        }
       }
     }
 
-    return NextResponse.json(data)
+    const member = await Member.findById(memberId)
+      .populate('family_group_id', 'name')
+      .lean()
+
+    return NextResponse.json(serializeMember(member))
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('member update error:', err)
+    const status = err.name === 'ValidationError' || err.code === 11000 ? 400 : 500
+    return NextResponse.json({ error: err.message }, { status })
   }
 }
 
 export async function DELETE(request, { params }) {
   try {
-    const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { error } = await supabase
-      .from('members')
-      .delete()
-      .eq('id', id)
+    const { Member, Relationship } = await modelsFor('members')
 
-    if (error) throw error
+    const { id } = await params
+    const memberId = oid(id)
+    if (!memberId) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    const user = await authUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const member = await Member.findById(memberId).lean()
+    if (!member) {
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
+    }
+
+    // Remove relationships in both directions, the member, then its photo.
+    await Relationship.deleteMany({
+      $or: [{ member_id: memberId }, { related_member_id: memberId }],
+    })
+    await Member.deleteOne({ _id: memberId })
+    await deleteMemberImage(memberId)
+
     return NextResponse.json({ success: true })
   } catch (err) {
+    console.error('member delete error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

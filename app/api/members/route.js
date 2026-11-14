@@ -1,93 +1,120 @@
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { assignMemberCode } from '@/lib/member-code'
 import { NextResponse } from 'next/server'
+import { escapeRegex, oid } from '@/lib/db'
+import { modelsFor } from '@/lib/models'
+import { authUser } from '@/lib/auth'
+import { assignMemberCode } from '@/lib/member-code'
+import { applyMembershipRules, cleanMemberInput } from '@/lib/member-input'
+import { applyMemberPhoto } from '@/lib/images'
+import { serializeMember } from '@/lib/serialize'
+
+const PUBLIC_FIELDS = 'first_name last_name date_of_birth date_of_membership'
+
+function nameFilter(term) {
+  const pattern = new RegExp(`(^|\\s)${escapeRegex(term)}`, 'i')
+  return { $or: [{ first_name: pattern }, { last_name: pattern }] }
+}
 
 export async function GET(request) {
   try {
-    const supabase = await createServerSupabaseClient()
+    const { Member } = await modelsFor('members')
+
     const { searchParams } = new URL(request.url)
 
-    let query = supabase
-      .from('members')
-      .select('*, family_groups(id, name)')
-      .order('last_name', { ascending: true })
+    const user = await authUser(request)
+    const publicSearch = !user && searchParams.get('search')
 
-    const status = searchParams.get('status')
-    const type = searchParams.get('type')
-    const gender = searchParams.get('gender')
+    if (!user && !publicSearch) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const search = searchParams.get('search')
-    const family_group_id = searchParams.get('family_group_id')
-    const address_area = searchParams.get('address_area')
+    const gender = searchParams.get('gender')
+    const filter = {}
 
-    if (status) query = query.eq('membership_status', status)
-    if (type) query = query.eq('membership_type', type)
-    if (gender) query = query.eq('gender', gender)
-    if (family_group_id) query = query.eq('family_group_id', family_group_id)
-    if (address_area) {
-      query = query.or(
-        `village.ilike.%${address_area}%,barangay.ilike.%${address_area}%`
-      )
-    }
-    if (search) {
-      query = query.or(
-        `first_name.ilike.${search}%,last_name.ilike.${search}%,first_name.ilike.% ${search}%,last_name.ilike.% ${search}%`
-      )
+    if (publicSearch) {
+      Object.assign(filter, nameFilter(search))
+      // The public register page filters spouse suggestions by gender.
+      if (gender) filter.gender = gender
+    } else {
+      const status = searchParams.get('status')
+      const type = searchParams.get('type')
+      const familyGroupId = searchParams.get('family_group_id')
+      const addressArea = searchParams.get('address_area')
+
+      if (status) filter.membership_status = status
+      if (type) filter.membership_type = type
+      if (gender) filter.gender = gender
+
+      if (familyGroupId) {
+        const groupId = oid(familyGroupId)
+        if (!groupId) return NextResponse.json([])
+        filter.family_group_id = groupId
+      }
+
+      if (addressArea) {
+        const pattern = new RegExp(escapeRegex(addressArea), 'i')
+        filter.$or = [{ village: pattern }, { barangay: pattern }]
+      }
+
+      if (search) {
+        const names = nameFilter(search)
+        if (filter.$or) {
+          filter.$and = [{ $or: filter.$or }, names]
+          delete filter.$or
+        } else {
+          Object.assign(filter, names)
+        }
+      }
     }
 
-    const { data, error } = await query
-    if (error) throw error
-    return NextResponse.json(data)
+    let queryBuilder = Member.find(filter)
+    if (publicSearch) {
+      queryBuilder = queryBuilder.select(PUBLIC_FIELDS)
+    } else {
+      queryBuilder = queryBuilder.populate('family_group_id', 'name')
+    }
+
+    const members = await queryBuilder
+      .collation({ locale: 'en', strength: 2 })
+      .sort({ last_name: 1, first_name: 1 })
+      .lean()
+
+    return NextResponse.json(members.map(serializeMember))
   } catch (err) {
+    console.error('members list error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 
 export async function POST(request) {
   try {
-    const supabase = await createServerSupabaseClient()
+    const { Member } = await modelsFor('members')
+
     const body = await request.json()
+    applyMembershipRules(body, { creating: true })
 
-    // Auto-set membership_status and membership_type based on date_of_membership
-    if (body.date_of_membership) {
-      if (!body.membership_status || body.membership_status === 'new') {
-        body.membership_status = 'active'
-      }
-      if (!body.membership_type) {
-        body.membership_type = 'regular'
-      }
-    } else {
-      body.membership_status = 'new'
-      body.membership_type = body.membership_type || null
+    const { values, photo, error } = cleanMemberInput(body)
+    if (error) return NextResponse.json({ error }, { status: 400 })
+
+    if (!values.first_name || !values.last_name || !values.date_of_birth) {
+      return NextResponse.json(
+        { error: 'first_name, last_name, and date_of_birth are required' },
+        { status: 400 }
+      )
     }
 
-    // Clear anniversary if not married
-    if (body.relationship_status !== 'married') {
-      body.wedding_anniversary = null
-    }
+    const created = await Member.create(values)
+    await applyMemberPhoto(created._id, photo, Member)
+    await assignMemberCode(created._id)
 
-    // Clean empty strings to null
-    const cleaned = Object.fromEntries(
-      Object.entries(body).map(([k, v]) => [k, v === '' ? null : v])
-    )
+    const member = await Member.findById(created._id)
+      .populate('family_group_id', 'name')
+      .lean()
 
-    const { data, error } = await supabase
-      .from('members')
-      .insert([cleaned])
-      .select()
-      .single()
-
-    if (error) throw error
-
-    await assignMemberCode(supabase, data.id)
-
-    const { data: updated } = await supabase
-      .from('members')
-      .select('*')
-      .eq('id', data.id)
-      .single()
-
-    return NextResponse.json(updated, { status: 201 })
+    return NextResponse.json(serializeMember(member), { status: 201 })
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('create member error:', err)
+    const status = err.name === 'ValidationError' || err.code === 11000 ? 400 : 500
+    return NextResponse.json({ error: err.message }, { status })
   }
 }

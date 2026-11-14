@@ -1,31 +1,46 @@
 'use client'
 import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
+import Link from 'next/link'
 import { useUser } from '@/components/UserProvider'
-import { LayoutIcon, UsersIcon, XIcon, MenuIcon, LogOutIcon } from '@/components/Icons'
+import { SMS_ENABLED } from '@/lib/features'
+import {
+  LayoutIcon,
+  UsersIcon,
+  MessageIcon,
+  PlusIcon,
+  XIcon,
+  MenuIcon,
+  LogOutIcon,
+} from '@/components/Icons'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutIcon, section: 'main' },
   { href: '/members', label: 'Members', icon: UsersIcon, section: 'main' },
 ]
 
+// Kept out of navItems on purpose: SMS is docked at the bottom of the nav,
+// directly above the admin-only entries.
+const smsItem = { href: '/sms', label: 'SMS', icon: MessageIcon }
+
 export default function Sidebar() {
-  const user = useUser()
+  const { user, logout } = useUser()
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
   const [loggingOut, setLoggingOut] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
 
+  const isAdmin = user?.role === 'admin' || user?.role === 'Administrator'
+
   async function handleLogout() {
     setLoggingOut(true)
-    await supabase.auth.signOut()
+    await logout()
     router.push('/login')
   }
 
   const userInitial = user?.email?.charAt(0)?.toUpperCase() || ''
-  const userDisplayName = user?.user_metadata?.display_name || user?.email || ''
+  const userDisplayName = user?.display_name || user?.first_name || user?.email || ''
+  const userRole = user?.role || 'Member'
 
   return (
     <>
@@ -62,7 +77,7 @@ export default function Sidebar() {
         <nav className="sidebar-nav">
           <div className="sidebar-section-label">Navigation</div>
           {navItems.map(item => (
-            <a
+            <Link
               key={item.href}
               href={item.href}
               className={`nav-item${pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)) ? ' active' : ''}`}
@@ -70,19 +85,47 @@ export default function Sidebar() {
             >
               <span className="nav-item-icon">{item.icon ? <item.icon size={18} /> : null}</span>
               {item.label}
-            </a>
+            </Link>
           ))}
+
+          {/* SMS: docked at the bottom, above the admin section */}
+          {SMS_ENABLED && (
+            <Link
+              href={smsItem.href}
+              className={`nav-item${pathname.startsWith(smsItem.href) ? ' active' : ''}`}
+              onClick={() => setIsOpen(false)}
+            >
+              <span className="nav-item-icon"><smsItem.icon size={18} /></span>
+              {smsItem.label}
+            </Link>
+          )}
+
+          {isAdmin && <div className="sidebar-section-label">Admin</div>}
+          {isAdmin && (
+            <Link
+              href="/admin/create-user"
+              className={`nav-item${pathname.startsWith('/admin') ? ' active' : ''}`}
+              onClick={() => setIsOpen(false)}
+            >
+              <span className="nav-item-icon"><PlusIcon size={18} /></span>
+              Create User
+            </Link>
+          )}
         </nav>
 
         {/* Footer */}
         <div className="sidebar-footer">
-          <div className="sidebar-user" style={{ cursor: 'pointer' }} onClick={() => router.push('/settings')}>
+          <Link
+            href="/settings"
+            className="sidebar-user"
+            onClick={() => setIsOpen(false)}
+          >
             <div className="sidebar-avatar">{userInitial}</div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">{userDisplayName}</div>
-              <div className="sidebar-user-role">Administrator</div>
+              <div className="sidebar-user-role">{userRole}</div>
             </div>
-          </div>
+          </Link>
           <button
             className="btn-logout"
             onClick={handleLogout}

@@ -2,7 +2,7 @@
 
 _by UCCP Sukat_
 
-A full-stack church family membership management web app built with **Next.js 16**, **Supabase**, and deployed to **Vercel**.
+A full-stack church family membership management web app built with **Next.js 16**, **MongoDB (Mongoose)**, and **MongoDB Atlas**. Authentication is a built-in app login (users + bcrypt in the app's own database).
 
 ## Features
 
@@ -11,28 +11,67 @@ A full-stack church family membership management web app built with **Next.js 16
 - **Profile Photos** — upload, crop to square, compress under 1MB, expand preview with replace/edit/delete
 - **Family Tree** — interactive visualization with spouse, sibling, parent, child, and grandchild relationships
 - **Admin Tools** — create users, reset passwords, delete users, list registered admins
-- **Auth** — Supabase Auth admin login with invite links and password reset via email
+- **Auth** — custom app login (email + password, bcrypt-hashed) with session cookie; admins created via `create-admin.js` or the admin console
 - **Dark/Light Theme** — toggleable theme with persistent preference
 
-## Quick Start
+## Architecture
 
-### 1. Create Supabase project
-Go to [supabase.com](https://supabase.com) → New Project.
+- **App hosting**: any Node.js host (self-hosted, container, or a Node platform). `next.config.mjs` sets `output: 'standalone'` for self-contained server builds.
+- **Database**: MongoDB via [Mongoose](https://mongoosejs.com/), spread across **three Atlas clusters** so a data problem never touches auth or photo bytes:
 
-### 2. Run the schema
-In your Supabase SQL editor, paste and run the contents of `family-sync-schema.sql`.
+  | Cluster | Env var | Stores |
+  |---|---|---|
+  | Admin | `MONGODB_URI` | users + sessions |
+  | Members | `MONGODB_URI_MEMBERS` | family groups, members, relationships, text blasts |
+  | Images | `MONGODB_URI_IMAGES` | profile photo bytes |
 
-### 3. Configure environment
+  Models live in `lib/models/`; `lib/models/index.js` exposes `modelsFor(domain)`, and `lib/db.js` holds one cached connection per domain. Cross-cluster `populate()` is not supported, so references between clusters (e.g. a blast's `created_by`) are resolved with a second query. Date-only fields (`date_of_birth`, `wedding_anniversary`, `date_of_membership`) are stored at **UTC midnight** and written through `parseDateOnly()`, so the API returns the same calendar day whatever the server timezone (local dev in UTC+8, Vercel in UTC).
+- **Auth**: sessions signed in `lib/auth.js`, verified on every API route; no external auth provider.
+- **Desktop widget**: Electron app that signs in with a Family Sync account and reads birthdays/anniversaries from `/api/widget/events`; no database credentials on the client.
+- **MongoDB only**: every read and write goes through the three Atlas clusters above. There is no Postgres/Supabase runtime, SDK, or connection string in the app.
+
+## Local Development
+
+### 1. Database
+
+Create three MongoDB Atlas clusters (or three databases on one local `mongod`): admin, members, and images.
+
+```bash
+# Atlas: create the clusters and copy each SRV connection string, or
+# local: install MongoDB Community Server and run `mongod`
+```
+
+Atlas requires your IP under **Network Access**. The database name is part of each URI (for example `db-admin-user`, `db-members`, `db-images`).
+
+### 2. Configure environment
+
 ```bash
 cp .env.local.example .env.local
 ```
 
-Fill in your Supabase URL and keys from **Project Settings → API**.
+Fill in the three connection strings:
 
-### 4. Create admin user
-After deploying, visit `/admin/create-user` to invite administrators, or use Supabase Dashboard → **Authentication → Users** to create the first account.
+```env
+MONGODB_URI=mongodb+srv://user:password@admin-cluster.example.mongodb.net/db-admin-user?retryWrites=true&w=majority
+MONGODB_URI_MEMBERS=mongodb+srv://user:password@members-cluster.example.mongodb.net/db-members?retryWrites=true&w=majority
+MONGODB_URI_IMAGES=mongodb+srv://user:password@images-cluster.example.mongodb.net/db-images?retryWrites=true&w=majority
+```
 
-### 5. Run locally
+Percent-encode special characters in passwords (`@` → `%40`, `$` → `%24`, `:` → `%3A`, `/` → `%2F`, `?` → `%3F`, `#` → `%23`); a raw `@` makes the URI unparseable.
+
+`WIDGET_API_KEY` is optional; it only protects the legacy `GET /api/public/events` endpoint. The desktop widget uses the session-authenticated `GET /api/widget/events` instead.
+
+### 3. Create the first admin user
+
+```bash
+node create-admin.js admin@example.com --password 'YourPass!'
+```
+
+Omitting `--password` generates a random one. Indexes (including the unique
+email and member_code indexes) are created automatically on first use.
+
+### 4. Run the app
+
 ```bash
 npm install
 npm run dev
@@ -40,15 +79,33 @@ npm run dev
 
 Visit http://localhost:3000
 
-## Deploy to Vercel
+> **Note (Windows):** your PowerShell execution policy may block `npm.ps1`; call `npm.cmd` instead.
 
-1. Push this folder to a GitHub repository
-2. Connect the repo in [vercel.com](https://vercel.com)
-3. Add environment variables:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-4. Deploy!
+## Data Storage
+
+All application data lives in the three MongoDB Atlas clusters (admin,
+members, images). The app talks to MongoDB directly through Mongoose; there is
+no Postgres or Supabase client, SDK, migration folder, or connection string in
+the codebase.
+
+To create or reset an account, use `node create-admin.js <email>` after the
+admin cluster is configured. 
+
+## Environment Variables
+
+| Variable | Purpose |
+|---|---|
+| `MONGODB_URI` | Admin cluster: users + sessions |
+| `MONGODB_URI_MEMBERS` | Members cluster: groups, members, relationships, text blasts |
+| `MONGODB_URI_IMAGES` | Images cluster: profile photo bytes |
+| `WIDGET_API_KEY` | Optional; protects the legacy `GET /api/public/events` endpoint |
+| `SMS_PROVIDER` | SMS provider mode; use `log` for development (default) |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_NUMBER` | Required only when `SMS_PROVIDER=twilio` |
+| `NEXT_PUBLIC_SMS_DEFAULT_COUNTRY_CODE` | Dialing code assumed for members' phone numbers (default `63`) |
+
+## Desktop Widget
+
+See [`widget/README.md`](widget/README.md). Set `WIDGET_APP_URL` in `widget/.env` to the running app URL, then build with `npm run build`. Sign in from the widget with a Family Sync account; it calls the session-authenticated `/api/widget/events`, so no database user or shared key is needed. The portable `.exe` reads `.env` from the folder it is placed in.
 
 ## Membership Logic
 
@@ -60,8 +117,23 @@ Visit http://localhost:3000
 
 ## Photo System
 
-- Photos are stored as base64 data URLs in the database
+- Photo bytes live in the `MONGODB_URI_IMAGES` cluster; member documents only store a `has_profile_picture` flag
+- The API returns `profile_picture` as a short `/api/images/<id>?v=<updated_at>` URL served by `app/api/images/[id]/route.js
 - Upload via the add/edit member form with a draggable, resizable square crop tool
 - Photos auto-compress under 1MB through iterative quality/dimension reduction
 - Click a profile photo on the member detail page to expand it with options to replace, edit crop, or delete
 - Profile photos display in the members list, family tree cards, and member detail page
+
+## Project Layout
+
+```
+app/                  Next.js pages + API route handlers
+components/           Shared React components
+lib/db.js             Mongoose connections (admin/members/images) + shared helpers
+lib/models/           Mongoose schemas + modelsFor(domain)
+lib/images.js         Profile photo storage in the images cluster
+lib/auth.js           Session + password helpers
+lib/serialize.js      API response shaping (id, dates, nested relations)
+scripts/              Admin creation + member-code backfill helpers
+widget/               Electron desktop widget
+```

@@ -1,10 +1,11 @@
 'use client'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase'
-
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { login } from '@/lib/api'
 
 export default function LoginPage() {
-  const supabase = createClient()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -14,12 +15,12 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password })
-    if (err) {
-      setError(err.message)
+    try {
+      await login(email, password)
+      router.push('/')
+    } catch (err) {
+      setError(err.message || 'Login failed')
       setLoading(false)
-    } else {
-      window.location.href = '/'
     }
   }
 
@@ -72,6 +73,12 @@ export default function LoginPage() {
         </form>
 
         <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          New member?{' '}
+          <Link href="/register" style={{ color: 'var(--primary)', textDecoration: 'none' }}>
+            Register here
+          </Link>
+        </p>
+        <p style={{ textAlign: 'center', marginTop: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           Contact your administrator to create an account.
         </p>
       </div>

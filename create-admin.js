@@ -1,50 +1,86 @@
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+// Create (or update) the admin user directly in MongoDB.
+// Run: node create-admin.js <email> [--password PASSWORD] [--role ROLE]
+// Env overrides: ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_ROLE
+// Reads MONGODB_URI from .env.local. If no password is given, one is generated.
+//
+// NOTE: the `role` enum only permits 'Administrator', so that is the default.
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+import dotenv from 'dotenv'
+dotenv.config({ path: '.env.local' })
 
-if (!supabaseUrl || !supabaseServiceKey || supabaseServiceKey === 'your-service-role-key-here') {
-  console.error('❌ Missing Supabase credentials in .env.local');
-  console.error('Make sure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.');
-  process.exit(1);
+import { registerPathHooks } from './scripts/register-path-hooks.mjs'
+
+function usage() {
+  console.error('Usage: node create-admin.js <email> [--password PASSWORD] [--role ROLE]')
+  console.error('Env overrides: ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_ROLE')
+  process.exit(1)
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+function parseArgs(argv) {
+  const args = argv.slice(2)
+  const out = { email: null, role: null, password: null, help: false }
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    if (a === '--role') { out.role = args[++i]; continue }
+    if (a === '--password') { out.password = args[++i]; continue }
+    if (a === '-h' || a === '--help') { out.help = true; continue }
+    if (!a.startsWith('-') && !out.email) { out.email = a; continue }
+    if (!a.startsWith('-')) { console.error('Unexpected argument: ' + a); out.help = true }
+  }
+  return out
+}
 
-const USERS = [
-  { email: 'admin@familysync.com', password: 'Password123!', role: 'Administrator' }
-];
+async function main() {
+  const opts = parseArgs(process.argv)
+  if (opts.help) return usage()
 
-async function seedUsers() {
-  console.log('🚀 Starting admin user creation...');
+  registerPathHooks()
 
-  for (const user of USERS) {
-    console.log(`Creating user: ${user.email}...`);
-    
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: user.email,
-      password: user.password,
-      email_confirm: true,
-      user_metadata: { role: user.role }
-    });
+  const { disconnectDB } = await import('./lib/db.js')
+  const { hashPassword, generateTempPassword } = await import('./lib/auth.js')
+  const { modelsFor } = await import('./lib/models/index.js')
 
-    if (error) {
-      if (error.message.includes('already registered')) {
-        console.log(`ℹ️  User ${user.email} already exists.`);
-      } else {
-        console.error(`❌ Error creating ${user.email}:`, error.message);
-      }
-    } else {
-      console.log(`✨ User ${user.email} created successfully!`);
-      console.log(`\n🔑 Login Credentials:`);
-      console.log(`Email: ${user.email}`);
-      console.log(`Password: ${user.password}\n`);
-    }
+  const email = (opts.email || process.env.ADMIN_EMAIL || '').trim().toLowerCase()
+  if (!email) {
+    console.error('Missing email. Provide it as the first argument or via ADMIN_EMAIL.')
+    return usage()
   }
 
-  console.log('✅ Admin creation complete.');
+  const role = (opts.role || process.env.ADMIN_ROLE || 'Administrator').trim()
+
+  const plain = opts.password || process.env.ADMIN_PASSWORD || generateTempPassword()
+  const passwordHash = await hashPassword(plain)
+
+  const { User } = await modelsFor('admin')
+
+  const existing = await User.findOne({ email }).lean()
+  if (existing) {
+    await User.updateOne(
+      { _id: existing._id },
+      { $set: { password_hash: passwordHash, role } }
+    )
+  } else {
+    await User.create({ email, password_hash: passwordHash, role })
+  }
+
+  const user = await User.findOne({ email }).lean()
+  if (!user) {
+    console.error('Failed to create/update admin user.')
+    process.exit(1)
+  }
+
+  console.log(existing ? 'Admin user updated.' : 'Admin user created.')
+  console.log('Credentials:')
+  console.log('  Email:     ' + user.email)
+  console.log('  Password:  ' + plain)
+  console.log('  Role:      ' + user.role)
+  console.log('User ID: ' + user._id)
+
+  // Close the connection so the process exits instead of idling on the socket.
+  await disconnectDB()
 }
 
-seedUsers();
+main().catch((err) => {
+  console.error('create-admin error:', err)
+  process.exit(1)
+})

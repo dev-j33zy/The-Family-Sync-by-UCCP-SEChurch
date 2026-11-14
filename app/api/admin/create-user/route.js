@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase-server'
+import { modelsFor } from '@/lib/models'
+import { authUser, generateTempPassword, hashPassword } from '@/lib/auth'
+import { serializeUser } from '@/lib/serialize'
 
 export async function POST(request) {
   try {
@@ -9,43 +11,42 @@ export async function POST(request) {
       return NextResponse.json({ error: 'First name, last name, and email are required' }, { status: 400 })
     }
 
-    const supabase = await createServerSupabaseClient()
+    const user = await authUser(request)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { User } = await modelsFor('admin')
+
+    const normalizedEmail = email.trim().toLowerCase()
+
+    const existing = await User.findOne({ email: normalizedEmail }).lean()
+    if (existing) {
+      return NextResponse.json({ error: 'A user with that email already exists' }, { status: 409 })
     }
 
-    const adminSupabase = createAdminSupabaseClient()
-    const origin = request.headers.get('origin')
-    const host = request.headers.get('host') || 'localhost:3000'
-    const protocol = request.headers.get('x-forwarded-proto') || 'http'
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin || `${protocol}://${host}`
+    const tempPassword = generateTempPassword()
+    const passwordHash = await hashPassword(tempPassword)
 
-    // Create user and send invitation email
-    const { data: inviteData, error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(email, {
-      data: {
-        first_name,
-        last_name,
-        role: 'Administrator',
-      },
-      redirectTo: `${appUrl}/auth/callback`,
+    const displayName = [first_name, last_name].filter(Boolean).join(' ').trim()
+
+    const created = await User.create({
+      email: normalizedEmail,
+      password_hash: passwordHash,
+      role: 'Administrator',
+      first_name: first_name.trim(),
+      last_name: last_name.trim(),
+      display_name: displayName,
     })
 
-    if (inviteError) {
-      return NextResponse.json({ error: inviteError.message }, { status: 400 })
-    }
-
-    return NextResponse.json({
-      message: 'Invitation sent via email successfully.',
-      user: {
-        id: inviteData.user.id,
-        email: inviteData.user.email,
-        first_name,
-        last_name,
+    return NextResponse.json(
+      {
+        message: 'User created successfully. Share the temporary password with them.',
+        tempPassword,
+        user: serializeUser(created),
       },
-    })
+      { status: 201 }
+    )
   } catch (err) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('create-user error:', err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import Sidebar from '@/components/Sidebar'
 import { useTheme } from '@/components/ThemeProvider'
-import { createClient } from '@/lib/supabase'
+import { fetchUser } from '@/lib/api'
+import { parseDateValue, toDateOnlyString } from '@/lib/utils'
 import { SaveIcon, SunIcon, MoonIcon, UploadIcon, DownloadIcon, FileIcon, AlertCircleIcon } from '@/components/Icons'
 
 const COLUMN_MAP = {
@@ -78,14 +79,15 @@ function mapHeaders(headers) {
 }
 
 export default function SettingsPage() {
-  const supabase = createClient()
   const router = useRouter()
   const { theme, devToolsVisible, toggleTheme, toggleDevTools, mounted } = useTheme()
   const fileInputRef = useRef(null)
 
   const [user, setUser] = useState(null)
-  const [displayName, setDisplayName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [saving, setSaving] = useState(false)
@@ -103,11 +105,12 @@ export default function SettingsPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      setUser(user)
-      setEmail(user.email || '')
-      setDisplayName(user.user_metadata?.display_name || '')
+      const fetched = await fetchUser()
+      if (!fetched) { router.push('/login'); return }
+      setUser(fetched)
+      setFirstName(fetched.first_name || '')
+      setLastName(fetched.last_name || '')
+      setEmail(fetched.email || '')
     }
     load()
   }, [])
@@ -119,12 +122,6 @@ export default function SettingsPage() {
     setError(null)
 
     try {
-      const updates = {}
-
-      if (displayName !== (user?.user_metadata?.display_name || '')) {
-        updates.data = { display_name: displayName }
-      }
-
       if (password) {
         if (password !== confirmPassword) {
           setError('Passwords do not match')
@@ -136,19 +133,46 @@ export default function SettingsPage() {
           setSaving(false)
           return
         }
-        updates.password = password
+        if (!currentPassword) {
+          setError('Current password is required to change the password')
+          setSaving(false)
+          return
+        }
       }
 
-      if (email !== user?.email) {
+      const displayName = [firstName, lastName].filter(Boolean).join(' ').trim()
+      const updates = {
+        display_name: displayName || null,
+        first_name: firstName || null,
+        last_name: lastName || null,
+      }
+
+      if (email !== user.email) {
         updates.email = email
       }
 
-      if (Object.keys(updates).length > 0) {
-        const { error } = await supabase.auth.updateUser(updates)
-        if (error) throw error
+      if (password) {
+        updates.current_password = currentPassword
+        updates.password = password
+      }
+
+      const res = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to save settings')
+
+      if (data.user) {
+        setUser(data.user)
+        setFirstName(data.user.first_name || '')
+        setLastName(data.user.last_name || '')
+        setEmail(data.user.email || '')
       }
 
       setMessage('Settings saved successfully')
+      setCurrentPassword('')
       setPassword('')
       setConfirmPassword('')
     } catch (err) {
@@ -195,16 +219,16 @@ export default function SettingsPage() {
             if (val !== undefined && val !== null && val !== '') {
               if (field === 'date_of_birth' || field === 'wedding_anniversary' || field === 'date_of_membership') {
                 if (val instanceof Date) {
-                  member[field] = val.toISOString().split('T')[0]
+                  member[field] = toDateOnlyString(val)
                 } else if (typeof val === 'number') {
                   const excelEpoch = new Date(1899, 11, 30)
                   const d = new Date(excelEpoch.getTime() + val * 86400000)
-                  member[field] = d.toISOString().split('T')[0]
+                  member[field] = toDateOnlyString(d)
                 } else {
                   const s = String(val).trim()
                   if (s) {
-                    const d = new Date(s)
-                    member[field] = isNaN(d.getTime()) ? s : d.toISOString().split('T')[0]
+                    const d = parseDateValue(s)
+                    member[field] = d ? toDateOnlyString(d) : s
                   }
                 }
               } else {
@@ -295,12 +319,9 @@ export default function SettingsPage() {
     setExportProgress({ message: 'Fetching members...', percent: 20 })
 
     try {
-      const { data: members, error } = await supabase
-        .from('members')
-        .select('last_name, first_name, middle_name, date_of_birth, gender, citizenship, relationship_status, wedding_anniversary, communicant_class_graduate, date_of_membership, membership_status, membership_type, phone_number, email_address, street_address, village, barangay, city')
-        .order('last_name', { ascending: true })
-
-      if (error) throw error
+      const res = await fetch('/api/members')
+      const members = await res.json()
+      if (!res.ok) throw new Error(members.error || 'Failed to fetch members')
 
       setExportProgress({ message: 'Generating file...', percent: 60 })
 
@@ -518,14 +539,22 @@ export default function SettingsPage() {
                 </div>
                 <div className="card-body">
                   <div className="form-group">
-                    <label className="form-label">Display Name</label>
+                    <label className="form-label">First Name</label>
                     <input
                       className="form-input"
-                      placeholder="Your display name"
-                      value={displayName}
-                      onChange={e => setDisplayName(e.target.value)}
+                      placeholder="Your first name"
+                      value={firstName}
+                      onChange={e => setFirstName(e.target.value)}
                     />
-                    <span className="form-hint">Shown in the sidebar</span>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Last Name</label>
+                    <input
+                      className="form-input"
+                      placeholder="Your last name"
+                      value={lastName}
+                      onChange={e => setLastName(e.target.value)}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Email</label>
@@ -547,6 +576,17 @@ export default function SettingsPage() {
                 </div>
                 <div className="card-body">
                   <div className="form-group">
+                    <label className="form-label">Current Password</label>
+                    <input
+                      className="form-input"
+                      type="password"
+                      placeholder="Your current password"
+                      value={currentPassword}
+                      onChange={e => setCurrentPassword(e.target.value)}
+                      autoComplete="current-password"
+                    />
+                  </div>
+                  <div className="form-group">
                     <label className="form-label">New Password</label>
                     <input
                       className="form-input"
@@ -554,6 +594,7 @@ export default function SettingsPage() {
                       placeholder="Leave blank to keep current"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
+                      autoComplete="new-password"
                     />
                   </div>
                   <div className="form-group">
@@ -564,6 +605,7 @@ export default function SettingsPage() {
                       placeholder="Re-enter new password"
                       value={confirmPassword}
                       onChange={e => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
                     />
                   </div>
                 </div>

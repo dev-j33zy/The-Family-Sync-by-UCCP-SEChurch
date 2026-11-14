@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import Sidebar from '@/components/Sidebar'
-import { createClient } from '@/lib/supabase'
 import { calculateAge, getFullName, getRelationshipLabel, capitalize, renderDatePickerHeader } from '@/lib/utils'
+
 import { PlusIcon, TreeIcon } from '@/components/Icons'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -89,9 +89,7 @@ function GroupRow({ children }) {
 // ── Main Tree View ────────────────────────────────────────────────────────────
 function FamilyTreeView() {
   const searchParams = useSearchParams()
-  const supabase = createClient()
 
-  const [user, setUser] = useState(null)
   const [allMembers, setAllMembers] = useState([])
   const [selectedId, setSelectedId] = useState(searchParams.get('member') || '')
   const [member, setMember] = useState(null)
@@ -154,8 +152,6 @@ function FamilyTreeView() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
       const res = await fetch('/api/members')
       if (res.ok) setAllMembers(await res.json())
     }
@@ -180,8 +176,11 @@ function FamilyTreeView() {
   }, [])
 
   useEffect(() => {
-    if (selectedId) loadMember(selectedId)
-    else clearMember()
+    async function syncSelectedMember() {
+      if (selectedId) await loadMember(selectedId)
+      else clearMember()
+    }
+    syncSelectedMember()
   }, [selectedId, loadMember, clearMember])
 
   // Relationship lookups

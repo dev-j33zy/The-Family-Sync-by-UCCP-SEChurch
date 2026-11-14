@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
-import { createClient } from '@/lib/supabase'
+import { fetchUser } from '@/lib/api'
 import { UsersIcon, ArrowLeftIcon, SaveIcon, TrashIcon, CheckIcon } from '@/components/Icons'
 
 function isRecent(dateStr, days = 7) {
@@ -14,17 +14,17 @@ function isRecent(dateStr, days = 7) {
 }
 
 export default function CreateUserPage() {
-  const supabase = createClient()
   const router = useRouter()
 
-  const [user, setUser] = useState(null)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
+  const [role, setRole] = useState('Administrator')
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState(null)
   const [error, setError] = useState(null)
   const [createdUser, setCreatedUser] = useState(null)
+  const [tempPassword, setTempPassword] = useState(null)
 
   const [resetEmail, setResetEmail] = useState('')
   const [resetting, setResetting] = useState(false)
@@ -41,9 +41,8 @@ export default function CreateUserPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-      setUser(user)
+      const fetched = await fetchUser()
+      if (!fetched) { router.push('/login'); return }
     }
     load()
   }, [])
@@ -61,12 +60,13 @@ export default function CreateUserPage() {
     setMessage(null)
     setError(null)
     setCreatedUser(null)
+    setTempPassword(null)
 
     try {
       const res = await fetch('/api/admin/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ first_name: firstName, last_name: lastName, email }),
+        body: JSON.stringify({ first_name: firstName, last_name: lastName, email, role }),
       })
 
       const data = await res.json()
@@ -75,6 +75,7 @@ export default function CreateUserPage() {
 
       setMessage(data.message)
       setCreatedUser(data.user)
+      setTempPassword(data.tempPassword)
       setFirstName('')
       setLastName('')
       setEmail('')
@@ -164,6 +165,19 @@ export default function CreateUserPage() {
                   <strong>Name:</strong> {createdUser.first_name} {createdUser.last_name}<br />
                 </div>
               )}
+              {tempPassword && (
+                <div style={{ marginTop: '12px', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <strong>Temporary Password:</strong>
+                  </div>
+                  <code style={{ fontSize: '1rem', fontFamily: 'monospace', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                    {tempPassword}
+                  </code>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    Share this with the user. They can change it after signing in.
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -212,6 +226,18 @@ export default function CreateUserPage() {
                       required
                     />
                   </div>
+                  <div className="form-group">
+                    <label className="form-label">Role</label>
+                    <select
+                      className="form-select"
+                      value={role}
+                      onChange={e => setRole(e.target.value)}
+                    >
+                      <option value="Administrator">Administrator</option>
+                      <option value="admin">admin</option>
+                      <option value="Member">Member</option>
+                    </select>
+                  </div>
                   <button
                     type="submit"
                     className="btn btn-primary"
@@ -219,7 +245,7 @@ export default function CreateUserPage() {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}
                   >
                     <UsersIcon size={18} />
-                    {submitting ? 'Sending Invitation…' : 'Send Invitation'}
+                    {submitting ? 'Creating User…' : 'Create User'}
                   </button>
                 </form>
               </div>

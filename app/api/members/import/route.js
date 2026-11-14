@@ -1,58 +1,54 @@
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { NextResponse } from 'next/server'
+import { modelsFor } from '@/lib/models'
 import { assignMemberCode } from '@/lib/member-code'
+import { authUser } from '@/lib/auth'
+import { cleanMemberInput } from '@/lib/member-input'
+import { applyMemberPhoto } from '@/lib/images'
+import { serializeMember } from '@/lib/serialize'
 
 export async function POST(request) {
-  const supabase = await createServerSupabaseClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   try {
+    const { Member } = await modelsFor('members')
+
+    const user = await authUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { members } = await request.json()
 
     if (!Array.isArray(members) || members.length === 0) {
-      return Response.json({ error: 'No members to import' }, { status: 400 })
+      return NextResponse.json({ error: 'No members to import' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
-      .from('members')
-      .insert(members.map(m => ({
-        last_name: m.last_name,
-        first_name: m.first_name,
-        middle_name: m.middle_name || null,
-        date_of_birth: m.date_of_birth,
-        gender: m.gender || null,
-        citizenship: m.citizenship || null,
-        relationship_status: m.relationship_status || null,
-        wedding_anniversary: m.wedding_anniversary || null,
-        communicant_class_graduate: m.communicant_class_graduate || null,
-        date_of_membership: m.date_of_membership || null,
-        membership_status: m.membership_status || 'new',
-        membership_type: m.membership_type || null,
-        phone_number: m.phone_number || null,
-        email_address: m.email_address || null,
-        street_address: m.street_address || null,
-        village: m.village || null,
-        barangay: m.barangay || null,
-        city: m.city || null,
-      })))
-      .select()
-
-    if (error) throw error
-
-    for (const member of data) {
-      await assignMemberCode(supabase, member.id)
+    const documents = []
+    const photos = []
+    for (const member of members) {
+      const { values, photo, error } = cleanMemberInput({
+        membership_status: 'new',
+        ...member,
+      })
+      if (error) return NextResponse.json({ error }, { status: 400 })
+      documents.push(values)
+      photos.push(photo)
     }
 
-    const { data: updated } = await supabase
-      .from('members')
-      .select('*')
-      .in('id', data.map(m => m.id))
+    const inserted = await Member.insertMany(documents)
+    for (let i = 0; i < inserted.length; i++) {
+      await applyMemberPhoto(inserted[i]._id, photos[i], Member)
+      await assignMemberCode(inserted[i]._id)
+    }
 
-    return Response.json({ data: updated, count: updated?.length || 0 })
+    const ids = inserted.map(member => member._id)
+    const updated = await Member.find({ _id: { $in: ids } }).lean()
+
+    return NextResponse.json({
+      data: updated.map(serializeMember),
+      count: updated.length,
+    })
   } catch (err) {
-    return Response.json({ error: err.message }, { status: 500 })
+    console.error('members import error:', err)
+    const status = err.name === 'ValidationError' || err.code === 11000 ? 400 : 500
+    return NextResponse.json({ error: err.message }, { status })
   }
 }
