@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import { useTheme } from '@/components/ThemeProvider'
 import { fetchUser } from '@/lib/api'
 import { parseDateValue, toDateOnlyString } from '@/lib/utils'
+import { memberDuplicateKey } from '@/lib/member-duplicate'
 import { SaveIcon, SunIcon, MoonIcon, UploadIcon, DownloadIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
 
 const COLUMN_MAP = {
@@ -62,6 +63,60 @@ const COLUMN_MAP = {
 }
 
 const REQUIRED_FIELDS = ['last_name', 'first_name', 'date_of_birth', 'gender']
+
+const ENUM_FIELDS = [
+  ['gender', ['male', 'female', 'other']],
+  ['relationship_status', ['single', 'married', 'widowed', 'separated', 'divorced']],
+  ['membership_status', ['new', 'active', 'dormant', 'cancelled']],
+  ['membership_type', ['regular', 'associate', 'affiliate']],
+  ['communicant_class_graduate', ['yes', 'no']],
+]
+
+const DATE_FIELDS = ['date_of_birth', 'wedding_anniversary', 'date_of_membership']
+
+function isValidDateOnly(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+}
+
+// Mirrors the member schema before the file is sent: required fields, enum
+// values, and real calendar dates. Enum values are normalised in place ("Male"
+// becomes "male") so a masterlist exported elsewhere still imports. Returns the
+// list of problems; an empty list means the row is importable.
+function validateMemberRow(member) {
+  const problems = []
+  const missing = REQUIRED_FIELDS.filter(f => !member[f])
+  if (missing.length) problems.push(`Missing: ${missing.join(', ')}`)
+
+  for (const [field, allowed] of ENUM_FIELDS) {
+    const value = member[field]
+    if (!value) continue
+    const normalized = String(value).trim().toLowerCase()
+    if (!allowed.includes(normalized)) {
+      problems.push(`Invalid ${field.replaceAll('_', ' ')} "${value}"`)
+    } else if (field === 'communicant_class_graduate') {
+      member[field] = normalized === 'yes' ? 'Yes' : 'No'
+    } else {
+      member[field] = normalized
+    }
+  }
+
+  for (const field of DATE_FIELDS) {
+    const value = member[field]
+    if (value && !isValidDateOnly(value)) {
+      problems.push(`Invalid ${field.replaceAll('_', ' ')} "${value}"`)
+    }
+  }
+
+  if (member.date_of_birth && isValidDateOnly(member.date_of_birth)) {
+    if (member.date_of_birth > toDateOnlyString(new Date())) {
+      problems.push('Date of birth is in the future')
+    }
+  }
+
+  return problems
+}
 
 function normalizeHeader(header) {
   if (!header) return null
@@ -193,7 +248,7 @@ export default function SettingsPage() {
     setImportErrors(null)
 
     const reader = new FileReader()
-    reader.onload = function (evt) {
+    reader.onload = async function (evt) {
       setImportProgress({ message: 'Parsing file...', percent: 40 })
       try {
         const data = new Uint8Array(evt.target.result)
@@ -242,12 +297,44 @@ export default function SettingsPage() {
             }
           }
           if (!hasData) return null
-
-          const missing = REQUIRED_FIELDS.filter(f => !member[f])
-          member._valid = missing.length === 0
-          member._errors = missing.length ? `Missing: ${missing.join(', ')}` : null
           return member
         }).filter(Boolean)
+
+        // Flag duplicates against the records on file and against earlier rows
+        // in the same file, then apply the schema-level field checks.
+        setImportProgress({ message: 'Checking for duplicates...', percent: 85 })
+        let existingKeys = new Set()
+        try {
+          const res = await fetch('/api/members', { cache: 'no-store' })
+          if (res.ok) {
+            const existing = await res.json()
+            if (Array.isArray(existing)) {
+              existingKeys = new Set(existing.map(memberDuplicateKey).filter(Boolean))
+            }
+          }
+        } catch {
+          // Without the lookup the preview cannot flag duplicates, but the
+          // import endpoint still rejects them.
+        }
+
+        const seenRows = new Map()
+        for (const member of parsed) {
+          const problems = validateMemberRow(member)
+          const key = memberDuplicateKey(member)
+          if (key) {
+            if (existingKeys.has(key)) {
+              problems.push('Already exists in the records')
+              member._duplicate = true
+            } else if (seenRows.has(key)) {
+              problems.push(`Duplicate of row ${seenRows.get(key)} in this file`)
+              member._duplicate = true
+            } else {
+              seenRows.set(key, member._row)
+            }
+          }
+          member._valid = problems.length === 0
+          member._errors = problems.length ? problems.join('; ') : null
+        }
 
         setImportProgress({ message: 'Preparing preview...', percent: 100 })
         setTimeout(() => {
@@ -273,7 +360,7 @@ export default function SettingsPage() {
 
     try {
       const validMembers = importPreview.members.filter(m => m._valid).map(m => {
-        const { _row, _valid, _errors, ...member } = m
+        const { _valid, _errors, _duplicate, ...member } = m
         return member
       })
 
@@ -300,7 +387,17 @@ export default function SettingsPage() {
         })
 
         const result = await res.json()
-        if (!res.ok) throw new Error(result.error)
+        if (!res.ok) {
+          if (Array.isArray(result.conflicts) && result.conflicts.length) {
+            const details = result.conflicts.map(c =>
+              c.reason === 'existing'
+                ? `Row ${c.row}: ${c.first_name} ${c.last_name} is already in the records`
+                : `Row ${c.row}: duplicates row ${c.duplicate_of} in this file`
+            ).join('; ')
+            throw new Error(`${result.error} (${details})`)
+          }
+          throw new Error(result.error)
+        }
         imported += result.count
         allResults.push(...result.data)
       }
@@ -713,6 +810,9 @@ export default function SettingsPage() {
                 </span>
                 <span className="import-stat">
                   Valid: <strong className="import-stat-valid">{importPreview.members.filter(m => m._valid).length}</strong>
+                </span>
+                <span className="import-stat">
+                  Duplicates: <strong className="import-stat-error">{importPreview.members.filter(m => m._duplicate).length}</strong>
                 </span>
                 <span className="import-stat">
                   With errors: <strong className="import-stat-error">{importPreview.members.filter(m => !m._valid).length}</strong>
