@@ -2,7 +2,15 @@
 
 A floating sticky-note widget for Windows that displays upcoming birthdays and wedding anniversaries from your Family Sync app.
 
-Current version: **1.4.0**
+Current version: **1.4.1**
+
+## What's new in 1.4.1
+
+- **Works on a fresh download** — with no `.env` next to the exe, the widget now defaults to the production app URL instead of refusing to start.
+- **Updates actually stick** — the updater follows GitHub's download redirect, verifies the file is a real Windows executable, and replaces the portable launcher instead of the temp copy that gets thrown away.
+- **Start with Windows survives a reboot** — autostart now points at the launcher exe, not the temporary extraction path.
+- Couple anniversaries are no longer listed twice, and a birthday shows the age the member actually turns today.
+- An expired session now says so instead of silently showing the sign-in screen.
 
 ## What's new in 1.4.0
 
@@ -51,9 +59,9 @@ Release notes for every version are on the [GitHub releases page](https://github
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `WIDGET_APP_URL` | Yes | Base URL of the running Family Sync app, e.g. `http://localhost:3000`. Trailing slashes are ignored. |
+| `WIDGET_APP_URL` | No | Base URL of the Family Sync app. Defaults to the production site (`https://the-family-sync-by-uccp-se-church.vercel.app`); set it to `http://localhost:3000` to point at a local copy. Trailing slashes are ignored. |
 
-In the portable build the `.env` is **not** bundled. Place it next to the `.exe` (the widget also accepts one next to an installed `.exe` or inside the app folder during development).
+In the portable build the `.env` is **not** bundled. You only need one if you want to override the default URL: place it next to the `.exe` (the widget also accepts one next to an installed `.exe` or inside the app folder during development).
 
 ## Usage
 
@@ -71,7 +79,7 @@ In the portable build the `.env` is **not** bundled. Place it next to the `.exe`
 npm run build
 ```
 
-Output in `dist/` (for example `Family Sync Widget 1.4.0.exe`).
+Output in `dist/` (for example `Family Sync Widget 1.4.1.exe`).
 
 If the build fails with `Cannot create symbolic link ... winCodeSign` (Windows without Developer Mode), build with exe icon/version editing disabled:
 
