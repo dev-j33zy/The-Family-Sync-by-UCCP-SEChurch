@@ -105,7 +105,7 @@ admin cluster is configured.
 
 ## Desktop Widget
 
-See [`widget/README.md`](widget/README.md). Build the portable exe with `npm run build`, or both the portable exe and the setup installer (`npm run build:all`) — every GitHub release must publish both, because an installed copy can only update through the installer. Sign in from the widget with a Family Sync account; it calls the session-authenticated `/api/widget/events`, so no database user or shared key is needed. The portable `.exe` defaults to the production app URL and only needs a `WIDGET_APP_URL` in a `.env` next to it when you want to point it somewhere else (for example `http://localhost:3000`).
+See [`widget/README.md`](widget/README.md). Build the setup installer with `npm run build`; that one file is what every GitHub release publishes, because an installed copy can only update through the installer. Sign in from the widget with a Family Sync account; it calls the session-authenticated `/api/widget/events`, so no database user or shared key is needed. The installer defaults to the production app URL and only needs a `WIDGET_APP_URL` in a `.env` next to the installed `.exe` when you want to point it somewhere else (for example `http://localhost:3000`).
 
 ## Membership Logic
 

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage, safeStorage, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage, safeStorage } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const https = require('https')
@@ -269,7 +269,7 @@ ipcMain.handle('save-settings', (_, settings) => {
 const AUTH_PATH = path.join(app.getPath('userData'), 'widget-auth.json')
 const SESSION_COOKIE = 'fsync_session'
 
-// Used when no .env is present (a fresh download of the portable exe).
+// Used when no .env is present (a normal install).
 const DEFAULT_APP_URL = 'https://the-family-sync-by-uccp-se-church.vercel.app'
 
 function appUrl() {
@@ -398,24 +398,16 @@ function compareSemver(a, b) {
   return 0
 }
 
-// An installed copy (the NSIS setup) lives in a folder only an elevated
-// process may write to, so it must update through the installer. The portable
-// exe is a single self-contained file that can replace itself in place.
-function installKind() {
-  if (process.env.PORTABLE_EXECUTABLE_FILE || process.env.PORTABLE_EXECUTABLE_DIR) return 'portable'
-  return 'installed'
-}
-
+// The widget is only ever distributed as the NSIS installer, and an installed
+// copy lives in a folder only an elevated process may write to, so the
+// installer is the only way to update.
 function isSetupAsset(name) {
   return /setup|installer/i.test(String(name || ''))
 }
 
-function pickUpdateAsset(assets, kind) {
+function pickSetupAsset(assets) {
   const exes = (assets || []).filter(a => /\.exe$/i.test(a.name))
-  const setup = exes.find(a => isSetupAsset(a.name))
-  const portable = exes.find(a => !isSetupAsset(a.name))
-  if (kind === 'installed') return setup || null
-  return portable || setup || null
+  return exes.find(a => isSetupAsset(a.name)) || null
 }
 
 ipcMain.handle('check-for-update', () => {
@@ -437,11 +429,10 @@ ipcMain.handle('check-for-update', () => {
               return
             }
             if (compareSemver(latestVer, currentVer) > 0) {
-              const kind = installKind()
-              const asset = pickUpdateAsset(release.assets, kind)
+              const asset = pickSetupAsset(release.assets)
               if (!asset) {
-                // A release without the asset this install needs: stay quiet
-                // instead of offering an update that cannot be applied.
+                // No installer in this release: stay quiet instead of offering
+                // an update that cannot be applied.
                 resolve({ available: false })
                 return
               }
@@ -450,7 +441,6 @@ ipcMain.handle('check-for-update', () => {
                 version: latestVer,
                 downloadUrl: asset.browser_download_url,
                 assetName: asset.name,
-                kind,
               })
             } else {
               resolve({ available: false })
@@ -508,16 +498,6 @@ function isWindowsExecutable(filePath) {
   }
 }
 
-function canReplace(filePath) {
-  try {
-    const fd = fs.openSync(filePath, 'r+')
-    fs.closeSync(fd)
-    return true
-  } catch {
-    return false
-  }
-}
-
 // Batch helpers run in a hidden console so the user never sees a terminal
 // window, and ping is used for the delay because `timeout` needs a real console.
 const WAIT_FOR_EXIT = [
@@ -547,12 +527,19 @@ function quitAfterHandoff() {
   }, 300)
 }
 
+// electron-builder names the installed executable after the product name, so
+// the copy the installer drops in the folder is always this file.
+const APP_EXE_NAME = 'Family Sync Widget.exe'
+
 ipcMain.handle('download-and-install-update', async (_, downloadUrl, assetName) => {
   if (!downloadUrl) throw new Error('No download URL was provided')
 
   const tempDir = app.getPath('temp')
   const assetFile = String(assetName || path.basename(new URL(downloadUrl).pathname) || '')
-  const safeName = assetFile.replace(/[^A-Za-z0-9._ -]/g, '') || 'family-sync-widget-update.exe'
+  const safeName = assetFile.replace(/[^A-Za-z0-9._ -]/g, '') || 'family-sync-widget-setup.exe'
+  if (!isSetupAsset(safeName)) {
+    throw new Error('This update is not an installer and cannot be applied')
+  }
   const tempExe = path.join(tempDir, safeName)
 
   await downloadToFile(downloadUrl, tempExe)
@@ -562,88 +549,33 @@ ipcMain.handle('download-and-install-update', async (_, downloadUrl, assetName) 
     throw new Error('The downloaded update is not a valid Windows executable')
   }
 
+  // Install into the folder of the exe the user actually launched. A portable
+  // build run from an older release extracts to temp, so process.execPath is
+  // the wrong folder; portableExecutablePath() covers both.
+  const launcher = portableExecutablePath()
+  const installDir = path.dirname(launcher)
+  const installedExe = path.join(installDir, APP_EXE_NAME)
   const exeName = path.basename(process.execPath)
-  const waitLines = WAIT_FOR_EXIT.map(line => line.replace(/\{exe\}/g, exeName))
 
-  // Installed copy: the installer is the only thing that can write to a
-  // protected folder like "D:\Program Files", so hand off to it and quit.
-  // It runs silently into the folder this copy lives in (an upgrade otherwise
-  // defaults to C:\Program Files), then the app comes back up.
-  if (isSetupAsset(safeName)) {
-    const installDir = path.dirname(process.execPath)
-    const appExe = process.execPath
-    runHiddenBatch(tempDir, 'update-widget.bat', [
-      '@echo off',
-      'setlocal',
-      ...waitLines,
-      'start /wait "" "' + tempExe + '" /S /D=' + installDir,
-      'start "" "' + appExe + '"',
-      'del "%~f0"',
-      'exit /b 0',
-    ])
-    quitAfterHandoff()
-    return { success: true, mode: 'installer' }
-  }
-
-  // Portable copy: replace the launcher the user actually runs.
-  const targetExe = portableExecutablePath()
-  if (!canReplace(targetExe)) {
-    // The exe sits in a folder this user cannot write to. Run the new version
-    // from a writable folder rather than looping on "Access is denied".
-    const updatesDir = path.join(app.getPath('userData'), 'updates')
-    fs.mkdirSync(updatesDir, { recursive: true })
-    const nextExe = path.join(updatesDir, safeName)
-    fs.copyFileSync(tempExe, nextExe)
-
-    dialog.showMessageBox({
-      type: 'info',
-      title: 'Update installed elsewhere',
-      message: 'The widget folder is not writable',
-      detail:
-        'The new version has been saved to:\n' + nextExe +
-        '\n\nIt will start in a moment. Delete the old copy in "' +
-        path.dirname(targetExe) + '" and point your shortcut at the new file to avoid being asked again.',
-      buttons: ['OK'],
-      noLink: true,
-    }).then(() => {
-      const child = spawn(nextExe, [], { detached: true, stdio: 'ignore', windowsHide: true })
-      child.unref()
-      app.isQuitting = true
-      app.quit()
-    }).catch(() => {
-      app.isQuitting = true
-      app.quit()
-    })
-
-    return { success: true, mode: 'relocated', path: nextExe }
-  }
-
+  // The installer needs elevation to write into "Program Files", so Windows
+  // shows its permission prompt; run it silently into this folder (an upgrade
+  // would otherwise default to C:\Program Files) and reopen the app after.
   runHiddenBatch(tempDir, 'update-widget.bat', [
     '@echo off',
     'setlocal',
-    ...waitLines,
-    'set /a tries=0',
-    ':copy',
-    'copy /Y "' + tempExe + '" "' + targetExe + '" >NUL 2>&1',
-    'if not errorlevel 1 goto done',
-    'set /a tries+=1',
-    'if %tries% GEQ 20 goto fail',
-    'ping -n 2 127.0.0.1 >NUL',
-    'goto copy',
-    ':done',
-    'start "" "' + targetExe + '"',
+    ...WAIT_FOR_EXIT.map(line => line.replace(/\{exe\}/g, exeName)),
+    'start /wait "" "' + tempExe + '" /S /D=' + installDir,
+    'if exist "' + installedExe + '" (',
+    '  start "" "' + installedExe + '"',
+    ') else (',
+    '  start "" "' + launcher + '"',
+    ')',
     'del "%~f0"',
     'exit /b 0',
-    ':fail',
-    // Could not replace the exe after all: start the launcher, which still
-    // holds the previous version.
-    'start "" "' + targetExe + '"',
-    'del "%~f0"',
-    'exit /b 1',
   ])
 
   quitAfterHandoff()
-  return { success: true, mode: 'portable' }
+  return { success: true, mode: 'installer' }
 })
 
 ipcMain.handle('open-external', (_, url) => {

@@ -1,15 +1,12 @@
 {
   "name": "family-sync-widget",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Desktop widget showing upcoming birthdays and anniversaries from The Family Sync",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "generate-icons": "node scripts/generate-icons.js",
-    "build": "npm run build:portable",
-    "build:portable": "npm run generate-icons && electron-builder --win portable",
-    "build:setup": "npm run generate-icons && electron-builder --win nsis",
-    "build:all": "npm run generate-icons && electron-builder --win portable nsis"
+    "build": "npm run generate-icons && electron-builder --win nsis"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -27,10 +24,7 @@
       "!scripts/**"
     ],
     "win": {
-      "target": [
-        "portable",
-        "nsis"
-      ],
+      "target": "nsis",
       "icon": "assets/icon-256.png"
     },
     "nsis": {
@@ -40,9 +34,6 @@
       "createDesktopShortcut": true,
       "deleteAppDataOnUninstall": false,
       "artifactName": "Family Sync Widget Setup ${version}.exe"
-    },
-    "portable": {
-      "artifactName": "Family Sync Widget ${version}.exe"
     }
   }
 }

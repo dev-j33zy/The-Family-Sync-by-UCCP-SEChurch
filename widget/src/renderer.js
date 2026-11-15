@@ -602,9 +602,9 @@
       }
       try {
         const result = await window.electronAPI.downloadAndInstallUpdate(downloadUrl, assetName)
-        // The widget hands off to the installer/updater script and quits; if it
-        // comes back it is because the update moved to a writable folder.
-        installBtn.textContent = result && result.mode === 'installer' ? 'Installing...' : 'Restarting...'
+        // The widget hands off to the installer and quits; the setup then
+        // reopens the app.
+        installBtn.textContent = result ? 'Installing...' : 'Restarting...'
       } catch (err) {
         const message = String((err && err.message) || '')
           .replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
