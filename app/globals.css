@@ -839,6 +839,28 @@ img { max-width: 100%; display: block; }
   -webkit-overflow-scrolling: touch;
 }
 
+/* The members list scrolls inside its own card instead of paginating. The
+   height leaves room for the page header, filter bar, and app padding so the
+   page itself never grows a second scrollbar. */
+.member-table-scroll {
+  max-height: calc(var(--app-height) - 320px);
+  min-height: 200px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.member-table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  /* Solid colour: the card is translucent, so rows would show through a
+     translucent sticky header while scrolling. */
+  background: #0e0b0c;
+  /* Sticky cells inside a border-collapse table lose their bottom border in
+     Chromium, so draw the divider as an inset shadow instead. */
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

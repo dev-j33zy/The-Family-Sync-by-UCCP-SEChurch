@@ -4,7 +4,7 @@ import Sidebar from '@/components/Sidebar'
 import { PlusIcon } from '@/components/Icons'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { todayDateString } from '@/lib/utils'
+import { todayDateString, membershipYearToDate, isValidMembershipYear } from '@/lib/utils'
 
 const EMPTY_FORM = {
   first_name: '',
@@ -50,12 +50,23 @@ export default function NewMemberPage() {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+
+    if (!isValidMembershipYear(form.date_of_membership)) {
+      setError(`Year of membership must be between 1900 and ${new Date().getFullYear()}`)
+      return
+    }
+
     setSaving(true)
 
     const res = await fetch('/api/members', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      // Membership is recorded as a year; it is stored as January 1 of that
+      // year so the date column stays a real date.
+      body: JSON.stringify({
+        ...form,
+        date_of_membership: membershipYearToDate(form.date_of_membership),
+      }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -178,10 +189,11 @@ export default function NewMemberPage() {
                       </select>
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="date_of_membership">Date of Membership (Baptism Date)</label>
-                      <input id="date_of_membership" type="date" className="form-input" value={form.date_of_membership}
-                        onChange={e => set('date_of_membership', e.target.value)} max={todayDateString()} />
-                      <span className="form-hint">Setting this date marks the member as Active.</span>
+                      <label className="form-label" htmlFor="date_of_membership">Year of Membership (Baptism Year)</label>
+                      <input id="date_of_membership" type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+                        className="form-input" placeholder="e.g. 2015" value={form.date_of_membership}
+                        onChange={e => set('date_of_membership', e.target.value.replace(/\D/g, '').slice(0, 4))} />
+                      <span className="form-hint">Setting this year marks the member as Active.</span>
                     </div>
                     <div className="form-group">
                       <label className="form-label" htmlFor="membership_status">Membership Status</label>

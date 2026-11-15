@@ -2,7 +2,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
-import { calculateAge, formatDate, capitalize, getFullName, getRelationshipLabel } from '@/lib/utils'
+import { calculateAge, formatDate, capitalize, getFullName, getRelationshipLabel, membershipDateToYear } from '@/lib/utils'
 import { PlusIcon, EditIcon, TrashIcon, TreeIcon, FrownIcon } from '@/components/Icons'
 import Link from 'next/link'
 
@@ -169,7 +169,7 @@ export default function MemberDetailPage({ params }) {
                   <DetailField label="Wedding Anniversary" value={formatDate(member.wedding_anniversary)} />
                 )}
                 <DetailField label="Communicant Class Graduate" value={member.communicant_class_graduate} />
-                <DetailField label="Date of Membership" value={member.date_of_membership ? formatDate(member.date_of_membership) : null} />
+                <DetailField label="Date of Membership" value={member.date_of_membership ? membershipDateToYear(member.date_of_membership) : null} />
                 <DetailField label="Registered" value={member.registered_at ? formatDate(member.registered_at) : null} />
               </div>
 

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useRef } from 'react'
-import { calculateAge, renderDatePickerHeader } from '@/lib/utils'
+import { calculateAge, renderDatePickerHeader, membershipYearToDate, membershipDateToYear, isValidMembershipYear } from '@/lib/utils'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 
@@ -48,7 +48,7 @@ const COMPARE_FIELDS = [
   { key: 'relationship_status', label: 'Relationship Status' },
   { key: 'wedding_anniversary', label: 'Wedding Anniversary' },
   { key: 'communicant_class_graduate', label: 'Communicant Class Graduate' },
-  { key: 'date_of_membership', label: 'Date of Membership' },
+  { key: 'date_of_membership', label: 'Year of Membership' },
   { key: 'phone_number', label: 'Phone Number' },
   { key: 'email_address', label: 'Email Address' },
   { key: 'street_address', label: 'Street Address' },
@@ -110,6 +110,13 @@ function formatVal(val) {
   return capitalize(String(val))
 }
 
+// Membership is captured as a year, but the API stores a real date. A year
+// becomes January 1 of that year; blank stays blank.
+function withMembershipDate(payload) {
+  if (!payload || !('date_of_membership' in payload)) return payload
+  return { ...payload, date_of_membership: membershipYearToDate(payload.date_of_membership) }
+}
+
 // Compare only what the public search actually returned. Optional fields that
 // are missing from `matchedMember` are not "differences" — treating them as
 // such listed every blank field as a change. Blank input never counts either:
@@ -117,9 +124,13 @@ function formatVal(val) {
 function compareFields(matchedMember, form) {
   return COMPARE_FIELDS.filter(f => {
     if (!(f.key in matchedMember)) return false
-    const existing = (matchedMember[f.key] ?? '').toString().toLowerCase()
-    const incoming = (form[f.key] ?? '').toString().toLowerCase()
-    if (!incoming) return false
+    const raw = (matchedMember[f.key] ?? '').toString()
+    const rawIncoming = (form[f.key] ?? '').toString()
+    if (!rawIncoming.trim()) return false
+    // The membership field is a year on both sides, so a stored full date and
+    // the typed year are the same value when the year matches.
+    const existing = (f.key === 'date_of_membership' ? membershipDateToYear(raw) : raw).toLowerCase()
+    const incoming = (f.key === 'date_of_membership' ? membershipDateToYear(rawIncoming) : rawIncoming).toLowerCase()
     return existing !== incoming
   })
 }
@@ -250,10 +261,16 @@ export default function RegisterPage() {
     e.preventDefault()
     setError('')
     setSuccessNote('')
+
+    if (!isValidMembershipYear(form.date_of_membership)) {
+      setError(`Year of membership must be between 1900 and ${new Date().getFullYear()}`)
+      return
+    }
+
     setSaving(true)
 
     try {
-      const payload = { ...form }
+      const payload = withMembershipDate({ ...form })
       if (payload.relationship_status !== 'married') {
         payload.wedding_anniversary = ''
       }
@@ -370,10 +387,7 @@ export default function RegisterPage() {
         return
       }
 
-      const payload = {}
-      for (const key of fieldsToUpdate) {
-        payload[key] = form[key]
-      }
+      const payload = withMembershipDate(Object.fromEntries(fieldsToUpdate.map(key => [key, form[key]])))
       if (payload.relationship_status && payload.relationship_status !== 'married') {
         payload.wedding_anniversary = null
       }
@@ -405,7 +419,7 @@ export default function RegisterPage() {
     setError('')
     setSaving(true)
     try {
-      const payload = { ...form }
+      const payload = withMembershipDate({ ...form })
       if (payload.relationship_status !== 'married') {
         payload.wedding_anniversary = ''
       }
@@ -787,20 +801,11 @@ export default function RegisterPage() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="date_of_membership">Date of Membership (Baptism Date)</label>
-                <div style={{ width: '100%' }}>
-                  <DatePicker
-                    id="date_of_membership"
-                    selected={parseDateString(form.date_of_membership)}
-                    onChange={date => set('date_of_membership', toDateString(date))}
-                    className="form-input"
-                    dateFormat="yyyy-MM-dd"
-                    maxDate={new Date()}
-                    renderCustomHeader={renderDatePickerHeader}
-                    placeholderText="Select date"
-                  />
-                </div>
-                <span className="form-hint">The date you were baptized or became a member.</span>
+                <label className="form-label" htmlFor="date_of_membership">Year of Membership (Baptism Year)</label>
+                <input id="date_of_membership" type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+                  className="form-input" placeholder="e.g. 2015" value={form.date_of_membership}
+                  onChange={e => set('date_of_membership', e.target.value.replace(/\D/g, '').slice(0, 4))} />
+                <span className="form-hint">The year you were baptized or became a member.</span>
               </div>
             </div>
           </div>

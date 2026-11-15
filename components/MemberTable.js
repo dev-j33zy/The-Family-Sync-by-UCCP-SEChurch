@@ -1,12 +1,22 @@
 'use client'
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { calculateAge, formatDate, getStatusColor, capitalize } from '@/lib/utils'
+import { calculateAge, capitalize, membershipDateToYear } from '@/lib/utils'
 import { SearchIcon, UsersIcon, EyeIcon, EditIcon, TrashIcon } from '@/components/Icons'
 
 function SortIcon({ field, currentField, direction }) {
   if (currentField !== field) return <span style={{ opacity: 0.3 }}>↕</span>
   return <span style={{ color: 'var(--primary)' }}>{direction === 'asc' ? '↑' : '↓'}</span>
+}
+
+function getAvatarClass(gender) {
+  if (gender === 'male') return 'table-avatar table-avatar-male'
+  if (gender === 'female') return 'table-avatar table-avatar-female'
+  return 'table-avatar table-avatar-other'
+}
+
+function getInitials(m) {
+  return `${m.first_name?.[0] || ''}${m.last_name?.[0] || ''}`.toUpperCase()
 }
 
 export default function MemberTable({ members, onDelete }) {
@@ -18,13 +28,10 @@ export default function MemberTable({ members, onDelete }) {
   const [filterAddressArea, setFilterAddressArea] = useState('')
   const [sortField, setSortField] = useState('last_name')
   const [sortDir, setSortDir] = useState('asc')
-  const [page, setPage] = useState(1)
-  const PER_PAGE = 12
 
   function handleSort(field) {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('asc') }
-    setPage(1)
   }
 
   const filtered = useMemo(() => {
@@ -54,9 +61,9 @@ export default function MemberTable({ members, onDelete }) {
     list.sort((a, b) => {
       let aVal = a[sortField] || ''
       let bVal = b[sortField] || ''
-      if (sortField === 'date_of_birth') {
-        aVal = new Date(aVal)
-        bVal = new Date(bVal)
+      if (sortField === 'date_of_birth' || sortField === 'date_of_membership') {
+        aVal = aVal ? new Date(aVal).getTime() : 0
+        bVal = bVal ? new Date(bVal).getTime() : 0
         return sortDir === 'asc' ? aVal - bVal : bVal - aVal
       }
       aVal = String(aVal).toLowerCase()
@@ -65,19 +72,6 @@ export default function MemberTable({ members, onDelete }) {
     })
     return list
   }, [members, search, filterStatus, filterType, filterGender, filterAddressArea, sortField, sortDir])
-
-  const totalPages = Math.ceil(filtered.length / PER_PAGE)
-  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
-
-  function getAvatarClass(gender) {
-    if (gender === 'male') return 'table-avatar table-avatar-male'
-    if (gender === 'female') return 'table-avatar table-avatar-female'
-    return 'table-avatar table-avatar-other'
-  }
-
-  function getInitials(m) {
-    return `${m.first_name?.[0] || ''}${m.last_name?.[0] || ''}`.toUpperCase()
-  }
 
   return (
     <div>
@@ -90,17 +84,17 @@ export default function MemberTable({ members, onDelete }) {
             className="form-input search-input"
             placeholder="Search by name, ID, age, or citizenship…"
             value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            onChange={e => setSearch(e.target.value)}
           />
         </div>
         <input
           className="form-input filter-select"
           placeholder="Address area (village/barangay)"
           value={filterAddressArea}
-          onChange={e => { setFilterAddressArea(e.target.value); setPage(1) }}
+          onChange={e => setFilterAddressArea(e.target.value)}
         />
         <select id="filter-status" className="form-select filter-select filter-dropdown" value={filterStatus}
-          onChange={e => { setFilterStatus(e.target.value); setPage(1) }}>
+          onChange={e => setFilterStatus(e.target.value)}>
           <option value="">Membership Status</option>
           <option value="new">New</option>
           <option value="active">Active</option>
@@ -108,33 +102,33 @@ export default function MemberTable({ members, onDelete }) {
           <option value="cancelled">Cancelled</option>
         </select>
         <select id="filter-type" className="form-select filter-select filter-dropdown" value={filterType}
-          onChange={e => { setFilterType(e.target.value); setPage(1) }}>
+          onChange={e => setFilterType(e.target.value)}>
           <option value="">Membership Type</option>
           <option value="regular">Regular</option>
           <option value="associate">Associate</option>
           <option value="affiliate">Affiliate</option>
         </select>
         <select id="filter-gender" className="form-select filter-select filter-dropdown" value={filterGender}
-          onChange={e => { setFilterGender(e.target.value); setPage(1) }}>
+          onChange={e => setFilterGender(e.target.value)}>
           <option value="">All Genders</option>
           <option value="male">Male</option>
           <option value="female">Female</option>
         </select>
         {(search || filterStatus || filterType || filterGender || filterAddressArea) && (
           <button className="btn btn-ghost btn-sm" onClick={() => {
-            setSearch(''); setFilterStatus(''); setFilterType(''); setFilterGender(''); setFilterAddressArea(''); setPage(1)
+            setSearch(''); setFilterStatus(''); setFilterType(''); setFilterGender(''); setFilterAddressArea('')
           }}>Clear</button>
         )}
       </div>
 
       {/* Results count */}
       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
-        Showing {paginated.length} of {filtered.length} member{filtered.length !== 1 ? 's' : ''}
+        {filtered.length} member{filtered.length !== 1 ? 's' : ''}
       </div>
 
       {/* Table */}
       <div className="card">
-        <div className="table-container">
+        <div className="table-container member-table-scroll">
           <table className="table">
             <thead>
               <tr>
@@ -149,7 +143,7 @@ export default function MemberTable({ members, onDelete }) {
               </tr>
             </thead>
             <tbody>
-              {paginated.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8}>
                     <div className="empty-state" style={{ padding: '48px 20px' }}>
@@ -158,7 +152,7 @@ export default function MemberTable({ members, onDelete }) {
                     </div>
                   </td>
                 </tr>
-              ) : paginated.map(member => (
+              ) : filtered.map(member => (
                 <tr key={member.id}>
                   <td>
                     <div className="table-member-name">
@@ -199,7 +193,7 @@ export default function MemberTable({ members, onDelete }) {
                     ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                   </td>
                   <td className="mobile-hide" style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                    {member.date_of_membership ? formatDate(member.date_of_membership, { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                    {member.date_of_membership ? membershipDateToYear(member.date_of_membership) : '—'}
                   </td>
                   <td>
                     <div className="flex gap-2">
@@ -225,17 +219,6 @@ export default function MemberTable({ members, onDelete }) {
             </tbody>
           </table>
         </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="pagination">
-            <button className="pagination-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <button key={p} className={`pagination-btn${page === p ? ' active' : ''}`} onClick={() => setPage(p)}>{p}</button>
-            ))}
-            <button className="pagination-btn" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>›</button>
-          </div>
-        )}
       </div>
     </div>
   )

@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx'
 import Sidebar from '@/components/Sidebar'
 import { useTheme } from '@/components/ThemeProvider'
 import { fetchUser } from '@/lib/api'
-import { parseDateValue, toDateOnlyString } from '@/lib/utils'
+import { parseDateValue, toDateOnlyString, membershipDateToYear } from '@/lib/utils'
 import { memberDuplicateKey } from '@/lib/member-duplicate'
 import { SaveIcon, SunIcon, MoonIcon, UploadIcon, DownloadIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
 
@@ -78,6 +78,33 @@ function isValidDateOnly(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const date = new Date(`${value}T00:00:00Z`)
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+}
+
+const EXCEL_EPOCH = new Date(1899, 11, 30)
+
+// Spreadsheet date cells arrive as Date objects, Excel serial numbers, or text.
+// Returns YYYY-MM-DD, or the original text when it cannot be understood (the
+// row validator then reports it).
+function resolveDateCell(value, field) {
+  // Membership is recorded as a year only. A bare "2015" (text or number) is
+  // the year 2015 — Excel would otherwise read the number 2015 as a serial
+  // date and produce 1905-07-08.
+  if (field === 'date_of_membership' && !(value instanceof Date)) {
+    const text = String(value).trim()
+    if (/^\d{4}$/.test(text)) {
+      const year = Number(text)
+      if (year >= 1900 && year <= new Date().getFullYear()) return `${text}-01-01`
+    }
+  }
+
+  if (value instanceof Date) return toDateOnlyString(value)
+  if (typeof value === 'number') {
+    return toDateOnlyString(new Date(EXCEL_EPOCH.getTime() + value * 86400000))
+  }
+  const text = String(value).trim()
+  if (!text) return ''
+  const date = parseDateValue(text)
+  return date ? toDateOnlyString(date) : text
 }
 
 // Mirrors the member schema before the file is sent: required fields, enum
@@ -276,20 +303,9 @@ export default function SettingsPage() {
             const field = mapping[header]
             const val = row[header]
             if (val !== undefined && val !== null && val !== '') {
-              if (field === 'date_of_birth' || field === 'wedding_anniversary' || field === 'date_of_membership') {
-                if (val instanceof Date) {
-                  member[field] = toDateOnlyString(val)
-                } else if (typeof val === 'number') {
-                  const excelEpoch = new Date(1899, 11, 30)
-                  const d = new Date(excelEpoch.getTime() + val * 86400000)
-                  member[field] = toDateOnlyString(d)
-                } else {
-                  const s = String(val).trim()
-                  if (s) {
-                    const d = parseDateValue(s)
-                    member[field] = d ? toDateOnlyString(d) : s
-                  }
-                }
+              if (DATE_FIELDS.includes(field)) {
+                const resolved = resolveDateCell(val, field)
+                if (resolved) member[field] = resolved
               } else {
                 member[field] = String(val).trim()
               }
@@ -436,7 +452,7 @@ export default function SettingsPage() {
         'Relationship Status': m.relationship_status || '',
         'Wedding Anniversary': m.wedding_anniversary || '',
         'Communicant Class Graduate': m.communicant_class_graduate || '',
-        'Date of Membership': m.date_of_membership || '',
+        'Date of Membership': membershipDateToYear(m.date_of_membership),
         'Membership Status': m.membership_status || '',
         'Membership Type': m.membership_type || '',
         'Phone Number': m.phone_number || '',

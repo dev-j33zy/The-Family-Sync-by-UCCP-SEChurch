@@ -3,7 +3,7 @@ import { useState, useEffect, use } from 'react'
 import Sidebar from '@/components/Sidebar'
 import { SaveIcon } from '@/components/Icons'
 import { useRouter } from 'next/navigation'
-import { getFullName, todayDateString } from '@/lib/utils'
+import { getFullName, todayDateString, membershipYearToDate, membershipDateToYear, isValidMembershipYear } from '@/lib/utils'
 import { FrownIcon } from '@/components/Icons'
 import Link from 'next/link'
 
@@ -41,7 +41,7 @@ function toFormMember(m) {
     relationship_status: m.relationship_status || '',
     wedding_anniversary: m.wedding_anniversary ? String(m.wedding_anniversary).slice(0, 10) : '',
     communicant_class_graduate: m.communicant_class_graduate || '',
-    date_of_membership: m.date_of_membership ? String(m.date_of_membership).slice(0, 10) : '',
+    date_of_membership: membershipDateToYear(m.date_of_membership),
     membership_status: m.membership_status || 'new',
     membership_type: m.membership_type || '',
     phone_number: m.phone_number || '',
@@ -88,12 +88,29 @@ export default function EditMemberPage({ params }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+
+    if (!isValidMembershipYear(form.date_of_membership)) {
+      setError(`Year of membership must be between 1900 and ${new Date().getFullYear()}`)
+      return
+    }
+
     setSaving(true)
+
+    // A year is the only thing the form collects now. If the year did not
+    // change, keep the exact date already on record (records imported with a
+    // full date must not silently shift to January 1). A changed year becomes
+    // January 1 of that year.
+    const originalYear = member ? membershipDateToYear(member.date_of_membership) : ''
+    const dateOfMembership = form.date_of_membership
+      ? form.date_of_membership === originalYear
+        ? String(member.date_of_membership).slice(0, 10)
+        : membershipYearToDate(form.date_of_membership)
+      : ''
 
     const res = await fetch(`/api/members/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, date_of_membership: dateOfMembership }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -219,10 +236,11 @@ export default function EditMemberPage({ params }) {
                         </select>
                       </div>
                       <div className="form-group">
-                        <label className="form-label" htmlFor="date_of_membership">Date of Membership (Baptism Date)</label>
-                        <input id="date_of_membership" type="date" className="form-input" value={form.date_of_membership}
-                          onChange={e => set('date_of_membership', e.target.value)} max={todayDateString()} />
-                        <span className="form-hint">Setting this date marks the member as Active.</span>
+                        <label className="form-label" htmlFor="date_of_membership">Year of Membership (Baptism Year)</label>
+                        <input id="date_of_membership" type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
+                          className="form-input" placeholder="e.g. 2015" value={form.date_of_membership}
+                          onChange={e => set('date_of_membership', e.target.value.replace(/\D/g, '').slice(0, 4))} />
+                        <span className="form-hint">Setting this year marks the member as Active.</span>
                       </div>
                       <div className="form-group">
                         <label className="form-label" htmlFor="membership_status">Membership Status</label>
