@@ -5,11 +5,22 @@ import { RELATIONSHIP_TYPES } from '@/lib/models/relationship'
 import { authUser } from '@/lib/auth'
 import { serializeRelationship } from '@/lib/serialize'
 
+// A relationship type says what `related_member_id` is to `member_id` (e.g.
+// Marvin's "father" is Genelle's father). The mirror row describes the reverse.
 const INVERSE_TYPES = {
   spouse: 'spouse',
   father: 'child',
   mother: 'child',
   sibling: 'sibling',
+}
+
+// "child" has no single inverse — the parent's own gender decides whether the
+// child's record reads father or mother. "grandchild" cannot be mirrored either,
+// because the model has no grandparent type (and the tree has no such slot).
+async function inverseTypeFor(type, memberId, Member) {
+  if (type !== 'child') return INVERSE_TYPES[type]
+  const parent = await Member.findById(memberId, 'gender').lean()
+  return parent?.gender === 'female' ? 'mother' : 'father'
 }
 
 async function describe(rel, { Member, FamilyGroup }) {
@@ -108,7 +119,7 @@ export async function POST(request) {
     ).lean()
 
     // Mirror the relationship on the other member.
-    const inverseType = INVERSE_TYPES[type]
+    const inverseType = await inverseTypeFor(type, memberId, Member)
     if (inverseType && RELATIONSHIP_TYPES.includes(inverseType)) {
       await Relationship.updateOne(
         {

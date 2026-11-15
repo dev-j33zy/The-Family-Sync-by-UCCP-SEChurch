@@ -6,8 +6,13 @@ import { assignMemberCode } from '@/lib/member-code'
 import { applyMembershipRules, cleanMemberInput } from '@/lib/member-input'
 import { applyMemberPhoto } from '@/lib/images'
 import { serializeMember } from '@/lib/serialize'
+import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
 
-const PUBLIC_FIELDS = 'first_name last_name date_of_birth date_of_membership'
+// The public register page only needs enough to spot an existing record, so do
+// not hand out birthday lists to anyone who guesses a common surname.
+const PUBLIC_FIELDS = 'first_name last_name date_of_birth'
+const PUBLIC_TERM_MIN = 2
+const PUBLIC_RESULT_LIMIT = 20
 
 function nameFilter(term) {
   const pattern = new RegExp(`(^|\\s)${escapeRegex(term)}`, 'i')
@@ -21,17 +26,27 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
 
     const user = await authUser(request)
-    const publicSearch = !user && searchParams.get('search')
+    const search = (searchParams.get('search') || '').trim()
+    const gender = searchParams.get('gender')
+    const publicSearch = !user && search
 
     if (!user && !publicSearch) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const search = searchParams.get('search')
-    const gender = searchParams.get('gender')
     const filter = {}
 
     if (publicSearch) {
+      // Unauthenticated: throttle so the single-letter prefixes cannot be
+      // walked to dump the whole directory.
+      const limit = rateLimit(`member-search:${clientIp(request)}`, {
+        limit: 60,
+        windowMs: 10 * 60 * 1000,
+      })
+      if (!limit.allowed) return tooManyRequests(limit.retryAfter)
+
+      if (search.length < PUBLIC_TERM_MIN) return NextResponse.json([])
+
       Object.assign(filter, nameFilter(search))
       // The public register page filters spouse suggestions by gender.
       if (gender) filter.gender = gender
@@ -69,7 +84,7 @@ export async function GET(request) {
 
     let queryBuilder = Member.find(filter)
     if (publicSearch) {
-      queryBuilder = queryBuilder.select(PUBLIC_FIELDS)
+      queryBuilder = queryBuilder.select(PUBLIC_FIELDS).limit(PUBLIC_RESULT_LIMIT)
     } else {
       queryBuilder = queryBuilder.populate('family_group_id', 'name')
     }
@@ -89,6 +104,17 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { Member } = await modelsFor('members')
+
+    // Public registration: a household registers a handful of people at most.
+    // Staff adding members from the app are signed in and skip the limit.
+    const user = await authUser(request)
+    if (!user) {
+      const limit = rateLimit(`member-register:${clientIp(request)}`, {
+        limit: 10,
+        windowMs: 60 * 60 * 1000,
+      })
+      if (!limit.allowed) return tooManyRequests(limit.retryAfter)
+    }
 
     const body = await request.json()
     applyMembershipRules(body, { creating: true })

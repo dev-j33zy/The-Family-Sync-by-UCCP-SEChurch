@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server'
 import { modelsFor } from '@/lib/models'
 import { createSession, setSessionCookie, verifyPassword } from '@/lib/auth'
+import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { serializeUser } from '@/lib/serialize'
 
 export async function POST(request) {
   try {
+    // 10 attempts per 10 minutes per address: enough for typos, not a
+    // password-guessing loop.
+    const limit = rateLimit(`login:${clientIp(request)}`, {
+      limit: 10,
+      windowMs: 10 * 60 * 1000,
+    })
+    if (!limit.allowed) return tooManyRequests(limit.retryAfter)
+
     const { email, password } = await request.json()
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })

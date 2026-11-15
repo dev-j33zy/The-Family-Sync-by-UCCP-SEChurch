@@ -110,6 +110,20 @@ function formatVal(val) {
   return capitalize(String(val))
 }
 
+// Compare only what the public search actually returned. Optional fields that
+// are missing from `matchedMember` are not "differences" — treating them as
+// such listed every blank field as a change. Blank input never counts either:
+// it means the member left the field out, not that the record should be erased.
+function compareFields(matchedMember, form) {
+  return COMPARE_FIELDS.filter(f => {
+    if (!(f.key in matchedMember)) return false
+    const existing = (matchedMember[f.key] ?? '').toString().toLowerCase()
+    const incoming = (form[f.key] ?? '').toString().toLowerCase()
+    if (!incoming) return false
+    return existing !== incoming
+  })
+}
+
 export default function RegisterPage() {
   const [step, setStep] = useState('disclaimer')
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false)
@@ -129,6 +143,7 @@ export default function RegisterPage() {
 
   const [confirmModal, setConfirmModal] = useState(null)
   const [createdMemberId, setCreatedMemberId] = useState(null)
+  const [successNote, setSuccessNote] = useState('')
  
   const age = useMemo(() => calculateAge(form.date_of_birth), [form.date_of_birth])
  
@@ -174,8 +189,11 @@ export default function RegisterPage() {
     setShowSpouseDropdown(false)
   }
 
+  // These endpoints require a signed-in staff account, so a public registrant
+  // cannot call them successfully. Report the outcome instead of pretending the
+  // couple was linked.
   async function doLinkSpouse(memberId, spouseMemberId, anniversary) {
-    await Promise.all([
+    const responses = await Promise.all([
       fetch(`/api/members/${memberId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -192,6 +210,7 @@ export default function RegisterPage() {
         body: JSON.stringify({ member_id: memberId, related_member_id: spouseMemberId, relationship_type: 'spouse' }),
       }),
     ])
+    return responses.every(res => res.ok)
   }
 
   function handleFileSelect(e) {
@@ -224,11 +243,13 @@ export default function RegisterPage() {
     setShowSpouseDropdown(false)
     setConfirmModal(null)
     setCreatedMemberId(null)
+    setSuccessNote('')
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    setSuccessNote('')
     setSaving(true)
 
     try {
@@ -240,19 +261,18 @@ export default function RegisterPage() {
       const searchRes = await fetch(
         `/api/members?search=${encodeURIComponent(payload.first_name)}`
       )
-      const allMembers = await searchRes.json()
+      // A rate-limited or failed lookup must not block the registration; the
+      // duplicate check is a convenience, not a gate.
+      const allMembers = searchRes.ok ? await searchRes.json() : []
+      const list = Array.isArray(allMembers) ? allMembers : []
 
-      const match = allMembers.find(m =>
+      const match = list.find(m =>
         m.first_name?.toLowerCase() === payload.first_name.toLowerCase() &&
         m.last_name?.toLowerCase() === payload.last_name.toLowerCase()
       )
 
       if (match) {
-        const diffs = COMPARE_FIELDS.filter(f => {
-          const existing = (match[f.key] || '').toString().toLowerCase()
-          const incoming = (payload[f.key] || '').toString().toLowerCase()
-          return existing !== incoming
-        })
+        const diffs = compareFields(match, payload)
         setMatchedMember(match)
         setSelectedFields(diffs.map(f => f.key))
         setStep('review')
@@ -301,13 +321,19 @@ export default function RegisterPage() {
     if (!confirmModal) return
     setSaving(true)
     try {
+      let linked = true
       if (answer === 'yes') {
-        await doLinkSpouse(
+        linked = await doLinkSpouse(
           confirmModal.memberId,
           confirmModal.spouseMemberId,
           confirmModal.anniversary
         )
       }
+      setSuccessNote(
+        linked
+          ? ''
+          : 'Your details were saved, but your spouse could not be linked automatically. Please ask the church office to link your records.'
+      )
       setConfirmModal(null)
       setCreatedMemberId(null)
       setStep('success')
@@ -330,7 +356,20 @@ export default function RegisterPage() {
     setSaving(true)
     setError('')
     try {
-      const fieldsToUpdate = selectedFields.length > 0 ? selectedFields : COMPARE_FIELDS.map(f => f.key)
+      // Only send what the member actually filled in; an omitted field must
+      // never blank a value the office already has on file.
+      const candidates =
+        selectedFields.length > 0
+          ? selectedFields
+          : compareFields(matchedMember, form).map(f => f.key)
+      const fieldsToUpdate = candidates.filter(key => (form[key] ?? '') !== '')
+
+      if (fieldsToUpdate.length === 0) {
+        setStep('success')
+        setSaving(false)
+        return
+      }
+
       const payload = {}
       for (const key of fieldsToUpdate) {
         payload[key] = form[key]
@@ -344,7 +383,16 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const data = await res.json()
+
+      if (res.status === 401 || res.status === 403) {
+        setError(
+          'For privacy, existing records can only be corrected by church staff. Please contact the church office, or choose "Register as New" to submit a fresh entry.'
+        )
+        setSaving(false)
+        return
+      }
+
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to update member')
       setStep('success')
     } catch (err) {
@@ -426,11 +474,7 @@ export default function RegisterPage() {
   }
 
   if (step === 'review' && matchedMember) {
-    const differences = COMPARE_FIELDS.filter(f => {
-      const existing = (matchedMember[f.key] || '').toString().toLowerCase()
-      const incoming = (form[f.key] || '').toString().toLowerCase()
-      return existing !== incoming
-    })
+    const differences = compareFields(matchedMember, form)
 
     return (
       <div className="register-page">
@@ -494,7 +538,7 @@ export default function RegisterPage() {
             )}
             <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '8px' }}>
               {selectedFields.length === 0
-                ? 'No fields selected \u2014 all changes will be applied.'
+                ? 'No fields selected \u2014 the listed changes will be applied.'
                 : `${selectedFields.length} field${selectedFields.length > 1 ? 's' : ''} selected for update.`}
             </p>
           </div>
@@ -549,6 +593,11 @@ export default function RegisterPage() {
             We appreciate you providing your membership details. A church representative
             will review your information and may reach out to you if needed.
           </p>
+          {successNote && (
+            <p style={{ color: 'var(--amber)', fontSize: '0.85rem', lineHeight: 1.6, marginTop: '12px' }}>
+              {successNote}
+            </p>
+          )}
           <button
             className="btn btn-secondary"
             onClick={resetForm}

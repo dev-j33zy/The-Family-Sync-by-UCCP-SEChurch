@@ -16,7 +16,7 @@ A full-stack church family membership management web app built with **Next.js 16
 
 ## Architecture
 
-- **App hosting**: any Node.js host (self-hosted, container, or a Node platform). `next.config.mjs` sets `output: 'standalone'` for self-contained server builds.
+- **App hosting**: any Node.js host (self-hosted, container, or a Node platform such as Vercel). Build with `npm run build` and serve with `npm start`; `next.config.mjs` also pins `outputFileTracingRoot` so a parent folder's `package-lock.json` does not change the traced workspace.
 - **Database**: MongoDB via [Mongoose](https://mongoosejs.com/), spread across **three Atlas clusters** so a data problem never touches auth or photo bytes:
 
   | Cluster | Env var | Stores |
@@ -59,7 +59,7 @@ MONGODB_URI_IMAGES=mongodb+srv://user:password@images-cluster.example.mongodb.ne
 
 Percent-encode special characters in passwords (`@` → `%40`, `$` → `%24`, `:` → `%3A`, `/` → `%2F`, `?` → `%3F`, `#` → `%23`); a raw `@` makes the URI unparseable.
 
-`WIDGET_API_KEY` is optional; it only protects the legacy `GET /api/public/events` endpoint. The desktop widget uses the session-authenticated `GET /api/widget/events` instead.
+`WIDGET_API_KEY` is optional and only keeps the **legacy** `GET /api/public/events` endpoint working for widget builds older than v1.4.0. The current desktop widget signs in with a normal account and uses the session-authenticated `GET /api/widget/events`, so once every installed widget is on 1.4.0+ the legacy endpoint and the key can be removed.
 
 ### 3. Create the first admin user
 
@@ -98,7 +98,7 @@ admin cluster is configured.
 | `MONGODB_URI` | Admin cluster: users + sessions |
 | `MONGODB_URI_MEMBERS` | Members cluster: groups, members, relationships, text blasts |
 | `MONGODB_URI_IMAGES` | Images cluster: profile photo bytes |
-| `WIDGET_API_KEY` | Optional; protects the legacy `GET /api/public/events` endpoint |
+| `WIDGET_API_KEY` | Legacy only: authorizes `GET /api/public/events` for widgets older than v1.4.0 (retire it once they are upgraded) |
 | `SMS_PROVIDER` | SMS provider mode; use `log` for development (default) |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_NUMBER` | Required only when `SMS_PROVIDER=twilio` |
 | `NEXT_PUBLIC_SMS_DEFAULT_COUNTRY_CODE` | Dialing code assumed for members' phone numbers (default `63`) |
@@ -118,11 +118,19 @@ See [`widget/README.md`](widget/README.md). Set `WIDGET_APP_URL` in `widget/.env
 ## Photo System
 
 - Photo bytes live in the `MONGODB_URI_IMAGES` cluster; member documents only store a `has_profile_picture` flag
-- The API returns `profile_picture` as a short `/api/images/<id>?v=<updated_at>` URL served by `app/api/images/[id]/route.js
+- The API returns `profile_picture` as a short `/api/images/<id>?v=<updated_at>` URL served by `app/api/images/[id]/route.js`
 - Upload via the add/edit member form with a draggable, resizable square crop tool
-- Photos auto-compress under 1MB through iterative quality/dimension reduction
+- Photos auto-compress under 1MB through iterative quality/dimension reduction on the client
+- The API also rejects uploads over **4 MB** or outside PNG/JPEG/WebP/GIF, before the member row is written (MongoDB documents are capped at 16 MB, and base64 inflates bytes by about a third)
 - Click a profile photo on the member detail page to expand it with options to replace, edit crop, or delete
 - Profile photos display in the members list, family tree cards, and member detail page
+
+## Security Notes
+
+- `GET /api/members?search=…` is the only unauthenticated read. It returns just `first_name`, `last_name`, and `date_of_birth` (for the registration duplicate check), requires a 2-character term, caps results at 20, and is rate limited per IP.
+- `POST /api/members` (public registration) and `POST /api/auth/login` are rate limited per IP.
+- Photo uploads are validated by type and size on the server (see above).
+- The in-memory limiter lives in `lib/rate-limit.js`. On a serverless host each instance keeps its own counters, which stops casual brute force and scripted spam but is not a cluster-wide quota; a shared store would be needed for that.
 
 ## Project Layout
 
