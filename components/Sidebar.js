@@ -8,7 +8,6 @@ import {
   LayoutIcon,
   UsersIcon,
   MessageIcon,
-  PlusIcon,
   XIcon,
   MenuIcon,
   LogOutIcon,
@@ -29,8 +28,6 @@ export default function Sidebar() {
   const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
-
-  const isAdmin = user?.role === 'admin' || user?.role === 'Administrator'
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -97,18 +94,6 @@ export default function Sidebar() {
             >
               <span className="nav-item-icon"><smsItem.icon size={18} /></span>
               {smsItem.label}
-            </Link>
-          )}
-
-          {isAdmin && <div className="sidebar-section-label">Admin</div>}
-          {isAdmin && (
-            <Link
-              href="/admin/create-user"
-              className={`nav-item${pathname.startsWith('/admin') ? ' active' : ''}`}
-              onClick={() => setIsOpen(false)}
-            >
-              <span className="nav-item-icon"><PlusIcon size={18} /></span>
-              Create User
             </Link>
           )}
         </nav>
