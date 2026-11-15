@@ -67,10 +67,17 @@ function getDefaultSettings() {
   }
 }
 
+// A portable build runs from a temp folder, so `process.execPath` points at
+// the extracted copy. Autostart and self-update must target the .exe the user
+// actually launched (electron-builder exposes it here).
+function portableExecutablePath() {
+  return process.env.PORTABLE_EXECUTABLE_FILE || process.execPath
+}
+
 function applyAutoStart(enabled) {
   app.setLoginItemSettings({
     openAtLogin: enabled,
-    path: process.execPath,
+    path: portableExecutablePath(),
   })
 }
 
@@ -262,9 +269,11 @@ ipcMain.handle('save-settings', (_, settings) => {
 const AUTH_PATH = path.join(app.getPath('userData'), 'widget-auth.json')
 const SESSION_COOKIE = 'fsync_session'
 
+// Used when no .env is present (a fresh download of the portable exe).
+const DEFAULT_APP_URL = 'https://the-family-sync-by-uccp-se-church.vercel.app'
+
 function appUrl() {
-  const raw = (process.env.WIDGET_APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').trim()
-  if (!raw) throw new Error('WIDGET_APP_URL is not set. Add it to the widget .env.')
+  const raw = (process.env.WIDGET_APP_URL || process.env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL).trim()
   return raw.replace(/\/+$/, '')
 }
 
@@ -425,43 +434,102 @@ ipcMain.handle('check-for-update', () => {
   })
 })
 
-ipcMain.handle('download-and-install-update', (_, downloadUrl) => {
+// GitHub release assets answer with a 302 to a CDN, and `https.get` does not
+// follow redirects — piping the raw response wrote the HTML redirect body into
+// the .exe. Follow the chain and verify we got a real executable.
+function downloadToFile(url, dest, redirects = 0) {
   return new Promise((resolve, reject) => {
-    const tempDir = app.getPath('temp')
-    const ext = '.exe'
-    const tempExe = path.join(tempDir, 'family-sync-widget-update' + ext)
-    const currentExe = process.execPath
-    const exeName = path.basename(currentExe)
-
-    const file = fs.createWriteStream(tempExe)
-    https.get(downloadUrl, (res) => {
-      res.pipe(file)
-      file.on('finish', () => {
-        file.close(() => {
-          const scriptPath = path.join(tempDir, 'update-widget.bat')
-          const lines = [
-            '@echo off',
-            'setlocal',
-            ':wait',
-            'tasklist /FI "IMAGENAME eq ' + exeName + '" 2>NUL | find /I "' + exeName + '" >NUL',
-            'if %ERRORLEVEL% EQU 0 (',
-            '  timeout /T 1 /NOBREAK >NUL',
-            '  goto wait',
-            ')',
-            'copy /Y "' + tempExe + '" "' + currentExe + '"',
-            'start "" "' + currentExe + '"',
-            'del "%~f0"',
-          ]
-          fs.writeFileSync(scriptPath, lines.join('\r\n'))
-          exec('start "" "' + scriptPath + '"', () => {})
-          resolve({ success: true })
-        })
+    if (redirects > 5) return reject(new Error('Too many redirects'))
+    https
+      .get(url, { headers: { 'User-Agent': 'family-sync-widget' } }, (res) => {
+        const status = res.statusCode || 0
+        if (status >= 300 && status < 400 && res.headers.location) {
+          res.resume()
+          const next = new URL(res.headers.location, url).toString()
+          return downloadToFile(next, dest, redirects + 1).then(resolve, reject)
+        }
+        if (status !== 200) {
+          res.resume()
+          return reject(new Error('Download failed (' + status + ')'))
+        }
+        const file = fs.createWriteStream(dest)
+        file.on('error', reject)
+        res.on('error', reject)
+        res.pipe(file)
+        file.on('finish', () => file.close(() => resolve(dest)))
       })
-    }).on('error', (err) => {
-      fs.unlink(tempExe, () => {})
-      reject(err)
-    })
+      .on('error', reject)
   })
+}
+
+function isWindowsExecutable(filePath) {
+  try {
+    const fd = fs.openSync(filePath, 'r')
+    const header = Buffer.alloc(2)
+    fs.readSync(fd, header, 0, 2, 0)
+    fs.closeSync(fd)
+    return header.toString('ascii') === 'MZ'
+  } catch {
+    return false
+  }
+}
+
+ipcMain.handle('download-and-install-update', async (_, downloadUrl) => {
+  if (!downloadUrl) throw new Error('No download URL was provided')
+
+  const tempDir = app.getPath('temp')
+  const tempExe = path.join(tempDir, 'family-sync-widget-update.exe')
+  // Portable builds run from a temp folder; replace the launcher exe instead.
+  const targetExe = portableExecutablePath()
+  const runningExe = process.execPath
+  const exeName = path.basename(runningExe)
+
+  await downloadToFile(downloadUrl, tempExe)
+
+  if (!isWindowsExecutable(tempExe)) {
+    fs.unlink(tempExe, () => {})
+    throw new Error('The downloaded update is not a valid Windows executable')
+  }
+
+  const scriptPath = path.join(tempDir, 'update-widget.bat')
+  const lines = [
+    '@echo off',
+    'setlocal',
+    ':wait',
+    'tasklist /FI "IMAGENAME eq ' + exeName + '" 2>NUL | find /I "' + exeName + '" >NUL',
+    'if %ERRORLEVEL% EQU 0 (',
+    '  timeout /T 1 /NOBREAK >NUL',
+    '  goto wait',
+    ')',
+    'set /a tries=0',
+    ':copy',
+    'copy /Y "' + tempExe + '" "' + targetExe + '" >NUL 2>&1',
+    'if not errorlevel 1 goto done',
+    'set /a tries+=1',
+    'if %tries% GEQ 20 goto fail',
+    'timeout /T 1 /NOBREAK >NUL',
+    'goto copy',
+    ':done',
+    'start "" "' + targetExe + '"',
+    'del "%~f0"',
+    'exit /b 0',
+    ':fail',
+    // Could not replace the exe (e.g. no write permission): start the launcher,
+    // which still holds the previous version.
+    'start "" "' + targetExe + '"',
+    'del "%~f0"',
+    'exit /b 1',
+  ]
+  fs.writeFileSync(scriptPath, lines.join('\r\n'))
+  exec('start "" "' + scriptPath + '"', () => {})
+
+  // Quit so the script can replace the running executable and relaunch it.
+  setImmediate(() => {
+    app.isQuitting = true
+    app.quit()
+  })
+
+  return { success: true }
 })
 
 ipcMain.handle('open-external', (_, url) => {

@@ -123,16 +123,6 @@
     return d.innerHTML
   }
 
-  function calcAge(dob) {
-    if (!dob) return null
-    const today = new Date()
-    const b = new Date(dob + 'T00:00:00')
-    let age = today.getFullYear() - b.getFullYear()
-    const m = today.getMonth() - b.getMonth()
-    if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--
-    return age
-  }
-
   function fmtDate(date) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
@@ -204,10 +194,10 @@
     }
   }
 
-  function renderSignedOut() {
+  function renderSignedOut(message) {
     const markup =
       '<div class="empty-state"><div class="empty-state-icon">' + SVGS.lock + '</div>' +
-      '<div>Sign in to see birthdays and anniversaries</div>' +
+      '<div>' + (message ? escHtml(message) : 'Sign in to see birthdays and anniversaries') + '</div>' +
       '<button type="button" class="btn-link btn-signin-inline">Sign in</button></div>'
 
     for (const sel of ['#events-list', '#calendar-grid']) {
@@ -231,10 +221,12 @@
       const payload = await window.electronAPI.getEvents()
 
       if (payload && payload.unauthorized) {
+        // Distinguish "never signed in" from "the stored session expired".
+        const wasSignedIn = auth.signedIn
         events = []
         auth = { signedIn: false, email: null }
         updateAuthUI()
-        renderSignedOut()
+        renderSignedOut(wasSignedIn ? 'Your session expired. Sign in again.' : null)
         return
       }
 
@@ -278,6 +270,8 @@
     today.setHours(0, 0, 0, 0)
 
     const upcoming = []
+    // Both spouses carry the same anniversary, so skip the couple's duplicate.
+    const anniversariesSeen = new Set()
 
     for (const m of events) {
       const name = fullName(m)
@@ -294,7 +288,8 @@
           icon: SVGS.birthday,
           date: thisYear,
           days,
-          detail: 'Turns ' + (calcAge(m.date_of_birth) + 1),
+          // The age they turn on `thisYear` (on the day itself that is today's age).
+          detail: 'Turns ' + (thisYear.getFullYear() - dob.getFullYear()),
         })
       }
 
@@ -304,6 +299,14 @@
         const thisYear = new Date(today.getFullYear(), ann.getMonth(), ann.getDate())
         if (thisYear < today) thisYear.setFullYear(today.getFullYear() + 1)
         const days = Math.round((thisYear - today) / (1000 * 60 * 60 * 24))
+
+        const spouseIds = m.spouse_ids || []
+        const coupleKey = spouseIds.length
+          ? [m.id, ...spouseIds].sort().join('|')
+          : (m.spouse_name ? [name, m.spouse_name].sort().join('|') : null)
+        if (coupleKey && anniversariesSeen.has(coupleKey)) continue
+        if (coupleKey) anniversariesSeen.add(coupleKey)
+
         const years = today.getFullYear() - ann.getFullYear() + (thisYear.getFullYear() > today.getFullYear() ? 1 : 0)
         const displayName = m.spouse_name ? name + ' & ' + m.spouse_name : name
         upcoming.push({
