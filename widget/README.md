@@ -2,7 +2,16 @@
 
 A floating sticky-note widget for Windows that displays upcoming birthdays and wedding anniversaries from your Family Sync app.
 
-Current version: **1.4.1**
+Current version: **1.4.2**
+
+## What's new in 1.4.2
+
+- **Installed copies update through the installer again** — the widget used to download the portable exe and copy it over its own executable, which cannot work from `Program Files` and ended in "Access is denied" plus the same update prompt. Installed builds now run the setup installer silently into the folder they live in, then reopen.
+- **No more terminal window** when an update installs.
+- The updater picks the right download for how the widget was installed (setup installer vs portable exe) and no longer offers an update it cannot apply.
+- A failed download or install now shows the reason in the update banner instead of silently resetting to "Install".
+- Portable copies in a read-only folder move themselves to a writable location instead of failing in a loop.
+- Releases now ship **both** the setup installer and the portable exe.
 
 ## What's new in 1.4.1
 
@@ -73,18 +82,21 @@ In the portable build the `.env` is **not** bundled. You only need one if you wa
 - **Sign in / Sign out** — click ⋯ → Sign in
 - **Check for updates** — the widget compares its version with the latest GitHub release
 
-## Build portable exe
+## Build releases
 
 ```
-npm run build
+npm run build          # portable exe  -> dist/Family Sync Widget <version>.exe
+npm run build:setup    # setup installer -> dist/Family Sync Widget Setup <version>.exe
+npm run build:all      # both
 ```
 
-Output in `dist/` (for example `Family Sync Widget 1.4.1.exe`).
+Publish **both** assets in every GitHub release. Installed copies can only update through the setup installer (they would need elevation to rewrite `Program Files`), while portable copies update by replacing their own exe. The widget picks the asset that matches how it was installed, so a release with only one of the two leaves the other kind stuck on "no update".
 
 If the build fails with `Cannot create symbolic link ... winCodeSign` (Windows without Developer Mode), build with exe icon/version editing disabled:
 
 ```
 npx electron-builder --win portable --config.win.signAndEditExecutable=false
+npx electron-builder --win nsis --config.win.signAndEditExecutable=false
 ```
 
 ## Security

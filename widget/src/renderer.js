@@ -575,25 +575,46 @@
   /* =============================================
      UPDATE NOTIFICATION
      ============================================= */
-  function showUpdateNotification(version, downloadUrl) {
+  function showUpdateNotification(version, downloadUrl, assetName) {
     const notif = $('#update-notification')
     const verEl = $('#update-version')
     const installBtn = $('#update-install')
     const remindBtn = $('#update-remind')
+    const errorEl = $('#update-error')
     if (!notif || !verEl || !installBtn || !remindBtn) return
     verEl.textContent = 'v' + version
     notif.classList.remove('hidden')
     installBtn.disabled = false
+    remindBtn.disabled = false
     installBtn.textContent = 'Install'
+    if (errorEl) {
+      errorEl.textContent = ''
+      errorEl.classList.add('hidden')
+    }
 
     installBtn.onclick = async function () {
       installBtn.disabled = true
+      remindBtn.disabled = true
       installBtn.textContent = 'Downloading...'
+      if (errorEl) {
+        errorEl.textContent = ''
+        errorEl.classList.add('hidden')
+      }
       try {
-        await window.electronAPI.downloadAndInstallUpdate(downloadUrl)
-      } catch {
+        const result = await window.electronAPI.downloadAndInstallUpdate(downloadUrl, assetName)
+        // The widget hands off to the installer/updater script and quits; if it
+        // comes back it is because the update moved to a writable folder.
+        installBtn.textContent = result && result.mode === 'installer' ? 'Installing...' : 'Restarting...'
+      } catch (err) {
+        const message = String((err && err.message) || '')
+          .replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
         installBtn.disabled = false
+        remindBtn.disabled = false
         installBtn.textContent = 'Install'
+        if (errorEl) {
+          errorEl.textContent = message || 'The update could not be installed.'
+          errorEl.classList.remove('hidden')
+        }
       }
     }
     remindBtn.onclick = function () {
@@ -608,7 +629,7 @@
     try {
       const result = await window.electronAPI.checkForUpdate()
       if (result && result.available && result.downloadUrl) {
-        showUpdateNotification(result.version, result.downloadUrl)
+        showUpdateNotification(result.version, result.downloadUrl, result.assetName)
       }
     } catch {}
   }

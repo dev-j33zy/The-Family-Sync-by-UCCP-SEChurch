@@ -710,10 +710,24 @@ body {
 
 #update-content {
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#update-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
+
+#update-error {
+  font-size: calc(var(--font-size) * 0.71);
+  color: var(--danger, #e57373);
+  line-height: 1.35;
+}
+
+#update-error.hidden { display: none; }
 
 #update-text {
   font-size: calc(var(--font-size) * 0.79);
