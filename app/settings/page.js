@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import { useTheme } from '@/components/ThemeProvider'
 import { fetchUser } from '@/lib/api'
 import { parseDateValue, toDateOnlyString } from '@/lib/utils'
-import { SaveIcon, SunIcon, MoonIcon, UploadIcon, DownloadIcon, FileIcon, AlertCircleIcon } from '@/components/Icons'
+import { SaveIcon, SunIcon, MoonIcon, UploadIcon, DownloadIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
 
 const COLUMN_MAP = {
   'last name': 'last_name',
@@ -114,6 +114,10 @@ export default function SettingsPage() {
     }
     load()
   }, [])
+
+  // Only administrators can open /admin/create-user; keep the shortcut in
+  // step with that page instead of offering it to everyone.
+  const canManageUsers = user?.role === 'Administrator' || user?.role === 'admin'
 
   async function handleSave(e) {
     e.preventDefault()
@@ -641,28 +645,48 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="card" style={{ marginTop: '24px' }}>
-              <div className="card-header">
-                <h2 className="card-title" style={{ margin: 0 }}>Developer</h2>
-              </div>
-              <div className="card-body">
-                <div className="form-group">
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <label className="form-label" style={{ margin: 0 }}>Next.js Dev Tools</label>
-                      <span className="form-hint" style={{ display: 'block', marginTop: '2px' }}>Show the floating route indicator in development</span>
+            <div className="settings-grid" style={{ marginTop: '24px' }}>
+              <div className="card">
+                <div className="card-header">
+                  <h2 className="card-title" style={{ margin: 0 }}>Developer</h2>
+                </div>
+                <div className="card-body">
+                  <div className="form-group">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <label className="form-label" style={{ margin: 0 }}>Next.js Dev Tools</label>
+                        <span className="form-hint" style={{ display: 'block', marginTop: '2px' }}>Show the floating route indicator in development</span>
+                      </div>
+                      <button
+                        type="button"
+                        className={`btn ${devToolsVisible ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={toggleDevTools}
+                        style={{ minWidth: '80px' }}
+                      >
+                        {devToolsVisible ? 'Visible' : 'Hidden'}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className={`btn ${devToolsVisible ? 'btn-primary' : 'btn-ghost'}`}
-                      onClick={toggleDevTools}
-                      style={{ minWidth: '80px' }}
-                    >
-                      {devToolsVisible ? 'Visible' : 'Hidden'}
-                    </button>
                   </div>
                 </div>
               </div>
+
+              {canManageUsers && (
+                <div className="card">
+                  <div className="card-header">
+                    <h2 className="card-title" style={{ margin: 0 }}>New User</h2>
+                  </div>
+                  <div className="card-body">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => router.push('/admin/create-user')}
+                    >
+                      <PlusIcon size={16} />
+                      Add New User
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </form>
         </div>
