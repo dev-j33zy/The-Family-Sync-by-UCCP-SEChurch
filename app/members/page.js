@@ -42,7 +42,7 @@ export default function MembersPage() {
     <div className="app-layout">
       <Sidebar />
       <main className="main-content">
-        <div className="page-wrapper">
+        <div className="page-wrapper members-page">
           <div className="page-header flex items-center justify-between">
             <div>
               <h1 className="page-title">Members</h1>

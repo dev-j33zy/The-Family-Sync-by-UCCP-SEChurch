@@ -10,6 +10,9 @@
   --bg-tertiary: #111827;
   --bg-card: rgba(255, 255, 255, 0.04);
   --bg-card-hover: rgba(255, 255, 255, 0.07);
+  /* Opaque stand-in for --bg-card, for sticky elements that must hide the rows
+     scrolling underneath them. */
+  --bg-card-solid: #0f0c0d;
   --bg-input: rgba(255, 255, 255, 0.06);
   --bg-input-focus: rgba(255, 255, 255, 0.09);
 
@@ -839,14 +842,40 @@ img { max-width: 100%; display: block; }
   -webkit-overflow-scrolling: touch;
 }
 
-/* The members list scrolls inside its own card instead of paginating. The
-   height leaves room for the page header, filter bar, and app padding so the
-   page itself never grows a second scrollbar. */
+/* The members page lays out as a full-height column: header, then the list
+   panel, which takes whatever height is left and stops a fixed gap above the
+   bottom edge of the window. */
+.members-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.member-list-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.member-list-view .card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The list scrolls inside its own card instead of paginating. Its height comes
+   from the flex chain above — no magic viewport offset — so the card always
+   ends the same distance above the browser's bottom edge. */
 .member-table-scroll {
-  max-height: calc(var(--app-height) - 320px);
-  min-height: 200px;
+  flex: 1;
+  min-height: 160px;
   overflow-y: auto;
   overflow-x: auto;
+  /* Follow the card's inner curve so the sticky header cannot paint over the
+     rounded top corners. */
+  border-radius: calc(var(--radius-lg) - 1px);
 }
 
 .member-table-scroll thead th {
@@ -855,7 +884,7 @@ img { max-width: 100%; display: block; }
   z-index: 1;
   /* Solid colour: the card is translucent, so rows would show through a
      translucent sticky header while scrolling. */
-  background: #0e0b0c;
+  background: var(--bg-card-solid);
   /* Sticky cells inside a border-collapse table lose their bottom border in
      Chromium, so draw the divider as an inset shadow instead. */
   box-shadow: inset 0 -1px 0 var(--border);
@@ -1528,6 +1557,7 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
   --bg-tertiary: #E2E8F0;
   --bg-card: rgba(0, 0, 0, 0.03);
   --bg-card-hover: rgba(0, 0, 0, 0.06);
+  --bg-card-solid: #e9edf7;
   --bg-input: rgba(0, 0, 0, 0.04);
   --bg-input-focus: rgba(0, 0, 0, 0.07);
 

@@ -74,7 +74,7 @@ export default function MemberTable({ members, onDelete }) {
   }, [members, search, filterStatus, filterType, filterGender, filterAddressArea, sortField, sortDir])
 
   return (
-    <div>
+    <div className="member-list-view">
       {/* Filter Bar */}
       <div className="filter-bar">
         <div className="search-wrapper">
