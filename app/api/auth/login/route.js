@@ -34,6 +34,8 @@ export async function POST(request) {
     await Session.deleteMany({ expires_at: { $lt: new Date() } })
     const token = await createSession(user._id)
 
+    await User.updateOne({ _id: user._id }, { $set: { last_login_at: new Date() } })
+
     const response = NextResponse.json({ user: serializeUser(user) })
     return setSessionCookie(response, token, request)
   } catch (err) {

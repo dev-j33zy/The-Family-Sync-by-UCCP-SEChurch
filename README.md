@@ -10,8 +10,9 @@ A full-stack church family membership management web app built with **Next.js 16
 - **Members** — full CRUD, search, filter, sort, paginate, communicant class tracking
 - **Profile Photos** — upload, crop to square, compress under 1MB, expand preview with replace/edit/delete
 - **Family Tree** — interactive visualization with spouse, sibling, parent, child, and grandchild relationships
-- **Admin Tools** — create users, reset passwords, delete users, list registered admins
-- **Auth** — custom app login (email + password, bcrypt-hashed) with session cookie; admins created via `create-admin.js` or the admin console
+- **Admin Tools** — invite users by email, send password-reset links, delete users, test email delivery, list registered admins
+- **Auth** — custom app login (email + password, bcrypt-hashed) with session cookie; admins invited from the admin console or seeded with `create-admin.js`
+- **Email** — Gmail API from the church Workspace mailbox: invitations, password resets, and account-change notifications
 - **Dark/Light Theme** — toggleable theme with persistent preference
 
 ## Architecture
@@ -27,6 +28,7 @@ A full-stack church family membership management web app built with **Next.js 16
 
   Models live in `lib/models/`; `lib/models/index.js` exposes `modelsFor(domain)`, and `lib/db.js` holds one cached connection per domain. Cross-cluster `populate()` is not supported, so references between clusters (e.g. a blast's `created_by`) are resolved with a second query. Date-only fields (`date_of_birth`, `wedding_anniversary`, `date_of_membership`) are stored at **UTC midnight** and written through `parseDateOnly()`, so the API returns the same calendar day whatever the server timezone (local dev in UTC+8, Vercel in UTC).
 - **Auth**: sessions signed in `lib/auth.js`, verified on every API route; no external auth provider.
+- **Email**: `lib/email.js` sends through the Gmail API with a Workspace refresh token; `lib/auth-tokens.js` issues single-use invite/reset links (hashed in the admin cluster, 48 h for invites, 1 h for resets).
 - **Desktop widget**: Electron app that signs in with a Family Sync account and reads birthdays/anniversaries from `/api/widget/events`; no database credentials on the client.
 - **MongoDB only**: every read and write goes through the three Atlas clusters above. There is no Postgres/Supabase runtime, SDK, or connection string in the app.
 
@@ -98,10 +100,59 @@ admin cluster is configured.
 | `MONGODB_URI` | Admin cluster: users + sessions |
 | `MONGODB_URI_MEMBERS` | Members cluster: groups, members, relationships, text blasts |
 | `MONGODB_URI_IMAGES` | Images cluster: profile photo bytes |
+| `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` / `GMAIL_REFRESH_TOKEN` | Gmail API credentials (see **Email** below) |
+| `EMAIL_FROM` | Address mail is sent from, e.g. `The Family Sync <no-reply@domain>`; must be the authorized mailbox or a verified "Send mail as" alias |
+| `NEXT_PUBLIC_APP_URL` | Absolute app URL used in emailed links; required in production |
 | `WIDGET_API_KEY` | Legacy only: authorizes `GET /api/public/events` for widgets older than v1.4.0 (retire it once they are upgraded) |
 | `SMS_PROVIDER` | SMS provider mode; use `log` for development (default) |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_NUMBER` | Required only when `SMS_PROVIDER=twilio` |
 | `NEXT_PUBLIC_SMS_DEFAULT_COUNTRY_CODE` | Dialing code assumed for members' phone numbers (default `63`) |
+
+## Email (Gmail API)
+
+Account email is for administrators and the committee only — members never get
+a login. All messages are sent from the church's Google Workspace mailbox
+through the Gmail API, which is included in the Workspace subscription (no
+per-email cost, roughly 2,000 messages/day per user).
+
+**One-time setup**
+
+1. Google Cloud Console → create a project → **APIs & Services → Library** →
+   enable **Gmail API**.
+2. **OAuth consent screen** → User type **Internal** → publishing status
+   **In production**. Internal apps skip Google's verification review, and a
+   production consent screen keeps the refresh token alive (tokens from a
+   "Testing" app expire after 7 days).
+3. **Credentials → Create credentials → OAuth client ID → Desktop app**.
+4. In Gmail, add the From address under **Settings → Accounts → "Send mail
+   as"** and verify it (skip if you send as the mailbox itself).
+5. Put the client id/secret in `.env.local`, then run:
+
+   ```bash
+   node scripts/gmail-auth.js
+   ```
+
+   It opens a consent page, prints `GMAIL_REFRESH_TOKEN`, and lists every
+   address the mailbox is allowed to send as. Copy the values into `.env.local`
+   and into the Vercel project (Production).
+
+6. Sign in as an administrator → **Admin Tools → Test Email** to confirm
+   delivery end to end.
+
+**What the app sends**
+
+| Message | Trigger | Notes |
+|---|---|---|
+| Invitation | Admin creates a user | 48-hour single-use link; opening it verifies the address and lets the person choose their own password |
+| Password reset | Admin "Send Reset Link", or "Forgot password?" on the login page | 1-hour single-use link; sessions are signed out once it is used |
+| Password changed | Self-service change or reset | Confirms the change; sent after the response |
+| Sign-in email changed | Settings | Sent to **both** the old and new address |
+| Account name updated | Settings | Confirms the new name |
+| Test email | Admin Tools | Verifies credentials without creating a user |
+
+If an invitation cannot be delivered (misconfiguration, Gmail rejection) the
+Admin Tools page shows the link so it can be passed along by hand. Public
+"forgot password" never reveals whether an address has an account.
 
 ## Desktop Widget
 
@@ -111,7 +162,7 @@ See [`widget/README.md`](widget/README.md). Build the setup installer with `npm 
 
 | Condition | Status | Type |
 |---|---|---|
-| No Date of Membership | `New` | Empty |
+| No Date of Membership | `Preparatory` | Empty |
 | Date of Membership set | `Active` | `Regular` (default, overridable) |
 | Manually overridden | Any | Any |
 
@@ -129,6 +180,10 @@ See [`widget/README.md`](widget/README.md). Build the setup installer with `npm 
 
 - `GET /api/members?search=…` is the only unauthenticated read. It returns just `first_name`, `last_name`, and `date_of_birth` (for the registration duplicate check), requires a 2-character term, caps results at 20, and is rate limited per IP.
 - `POST /api/members` (public registration) and `POST /api/auth/login` are rate limited per IP.
+- `POST /api/auth/forgot-password` returns the same response whether or not the address exists, and sends the mail after the response so timing does not reveal it. It is limited to 5 requests per IP and 3 per address per 15 minutes.
+- Invite and reset tokens are 32 random bytes, stored only as SHA-256 hashes in the admin cluster, single-use, and expire after 48 hours (invite) or 1 hour (reset). Using one signs out every other session, and the token is only burned once the new password passes validation.
+- Changing the sign-in email or password requires the current password. Changing the email notifies both the old and the new address.
+- Passwords must be at least 8 characters (`lib/password-policy.js`).
 - Photo uploads are validated by type and size on the server (see above).
 - The in-memory limiter lives in `lib/rate-limit.js`. On a serverless host each instance keeps its own counters, which stops casual brute force and scripted spam but is not a cluster-wide quota; a shared store would be needed for that.
 
@@ -141,7 +196,11 @@ lib/db.js             Mongoose connections (admin/members/images) + shared helpe
 lib/models/           Mongoose schemas + modelsFor(domain)
 lib/images.js         Profile photo storage in the images cluster
 lib/auth.js           Session + password helpers
+lib/auth-tokens.js    Invite / password-reset tokens (hashed, single-use)
+lib/email.js          Gmail API sender (OAuth refresh token, MIME builder)
+lib/email-templates.js  Invite, reset and notification message bodies
+lib/account-mail.js   Who gets which account email
 lib/serialize.js      API response shaping (id, dates, nested relations)
-scripts/              Admin creation + member-code backfill helpers
+scripts/              Gmail auth, admin creation + member-code backfill helpers
 widget/               Electron desktop widget
 ```

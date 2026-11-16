@@ -57,10 +57,17 @@ async function main() {
   if (existing) {
     await User.updateOne(
       { _id: existing._id },
-      { $set: { password_hash: passwordHash, role } }
+      { $set: { password_hash: passwordHash, role, password_changed_at: new Date() } }
     )
   } else {
-    await User.create({ email, password_hash: passwordHash, role })
+    // Run by someone with database access, so the address is trusted.
+    await User.create({
+      email,
+      password_hash: passwordHash,
+      role,
+      email_verified_at: new Date(),
+      password_changed_at: new Date(),
+    })
   }
 
   const user = await User.findOne({ email }).lean()

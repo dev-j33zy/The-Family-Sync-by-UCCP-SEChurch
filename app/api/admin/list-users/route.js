@@ -19,6 +19,10 @@ export async function GET(request) {
       first_name: u.first_name || '',
       last_name: u.last_name || '',
       created_at: u.created_at,
+      email_verified_at: u.email_verified_at || null,
+      invited_at: u.invited_at || null,
+      password_changed_at: u.password_changed_at || null,
+      last_login_at: u.last_login_at || null,
     }))
 
     return NextResponse.json({ admins })

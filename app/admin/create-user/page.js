@@ -5,12 +5,11 @@ import Sidebar from '@/components/Sidebar'
 import { fetchUser } from '@/lib/api'
 import { UsersIcon, ArrowLeftIcon, SaveIcon, TrashIcon, CheckIcon } from '@/components/Icons'
 
-function isRecent(dateStr, days = 7) {
-  if (!dateStr) return false
-  const then = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now - then
-  return diffMs >= 0 && diffMs < days * 24 * 60 * 60 * 1000
+function formatDate(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 export default function CreateUserPage() {
@@ -19,17 +18,24 @@ export default function CreateUserPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState('Administrator')
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState(null)
   const [error, setError] = useState(null)
   const [createdUser, setCreatedUser] = useState(null)
-  const [tempPassword, setTempPassword] = useState(null)
+  const [inviteUrl, setInviteUrl] = useState(null)
+  const [emailError, setEmailError] = useState(null)
+  const [copied, setCopied] = useState(false)
 
   const [resetEmail, setResetEmail] = useState('')
   const [resetting, setResetting] = useState(false)
-  const [resetSent, setResetSent] = useState(false)
+  const [resetMessage, setResetMessage] = useState(null)
+  const [resetFallbackUrl, setResetFallbackUrl] = useState(null)
   const [resetError, setResetError] = useState(null)
+
+  const [testEmail, setTestEmail] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState(null)
+  const [testError, setTestError] = useState(null)
 
   const [deleteEmail, setDeleteEmail] = useState('')
   const [deletingUser, setDeletingUser] = useState(false)
@@ -43,6 +49,7 @@ export default function CreateUserPage() {
     async function load() {
       const fetched = await fetchUser()
       if (!fetched) { router.push('/login'); return }
+      setTestEmail(fetched.email || '')
     }
     load()
   }, [])
@@ -54,19 +61,31 @@ export default function CreateUserPage() {
       .finally(() => setAdminsLoading(false))
   }, [])
 
+  async function copyLink(url) {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard access can be blocked; the URL is visible to copy by hand.
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setSubmitting(true)
     setMessage(null)
     setError(null)
     setCreatedUser(null)
-    setTempPassword(null)
+    setInviteUrl(null)
+    setEmailError(null)
+    setCopied(false)
 
     try {
       const res = await fetch('/api/admin/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ first_name: firstName, last_name: lastName, email, role }),
+        body: JSON.stringify({ first_name: firstName, last_name: lastName, email }),
       })
 
       const data = await res.json()
@@ -75,10 +94,14 @@ export default function CreateUserPage() {
 
       setMessage(data.message)
       setCreatedUser(data.user)
-      setTempPassword(data.tempPassword)
+      setInviteUrl(data.email_sent ? null : data.invite_url || null)
+      setEmailError(data.email_sent ? null : data.email_error || null)
       setFirstName('')
       setLastName('')
       setEmail('')
+
+      const refreshed = await fetch('/api/admin/list-users').then(r => r.json()).catch(() => null)
+      if (refreshed?.admins) setAdmins(refreshed.admins)
     } catch (err) {
       setError(err.message)
     }
@@ -88,7 +111,8 @@ export default function CreateUserPage() {
   async function handleResetPassword(e) {
     e.preventDefault()
     setResetError(null)
-    setResetSent(false)
+    setResetMessage(null)
+    setResetFallbackUrl(null)
 
     if (!resetEmail) {
       setResetError('Please enter an email address')
@@ -105,13 +129,42 @@ export default function CreateUserPage() {
 
       const data = await res.json()
 
-      if (!res.ok) throw new Error(data.error)
+      if (!res.ok) {
+        // The API hands back a working link when delivery fails, so the admin
+        // can still pass it along.
+        if (data.reset_url) setResetFallbackUrl(data.reset_url)
+        throw new Error(data.error)
+      }
 
-      setResetSent(true)
+      setResetMessage(data.message)
     } catch (err) {
       setResetError(err.message)
     }
     setResetting(false)
+  }
+
+  async function handleTestEmail(e) {
+    e.preventDefault()
+    setTestError(null)
+    setTestResult(null)
+    if (!testEmail) {
+      setTestError('Please enter an email address')
+      return
+    }
+    setTesting(true)
+    try {
+      const res = await fetch('/api/admin/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: testEmail }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setTestResult(data.message)
+    } catch (err) {
+      setTestError(err.message)
+    }
+    setTesting(false)
   }
 
   async function handleDeleteUser(e) {
@@ -165,16 +218,23 @@ export default function CreateUserPage() {
                   <strong>Name:</strong> {createdUser.first_name} {createdUser.last_name}<br />
                 </div>
               )}
-              {tempPassword && (
+              {emailError && (
+                <div style={{ marginTop: '8px', fontSize: '0.8rem' }}>
+                  {emailError}
+                </div>
+              )}
+              {inviteUrl && (
                 <div style={{ marginTop: '12px', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                    <strong>Temporary Password:</strong>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    <strong>Invitation link:</strong> share this with the user. It expires in 48 hours.
                   </div>
-                  <code style={{ fontSize: '1rem', fontFamily: 'monospace', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-                    {tempPassword}
+                  <code style={{ fontSize: '0.78rem', fontFamily: 'monospace', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                    {inviteUrl}
                   </code>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-                    Share this with the user. They can change it after signing in.
+                  <div style={{ marginTop: '8px' }}>
+                    <button type="button" className="btn btn-ghost" onClick={() => copyLink(inviteUrl)}>
+                      {copied ? 'Copied' : 'Copy link'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -225,18 +285,10 @@ export default function CreateUserPage() {
                       onChange={e => setEmail(e.target.value)}
                       required
                     />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Role</label>
-                    <select
-                      className="form-select"
-                      value={role}
-                      onChange={e => setRole(e.target.value)}
-                    >
-                      <option value="Administrator">Administrator</option>
-                      <option value="admin">admin</option>
-                      <option value="Member">Member</option>
-                    </select>
+                    <span className="form-hint">
+                      The user receives an invitation link. Opening it verifies this address
+                      and lets them choose their own password.
+                    </span>
                   </div>
                   <button
                     type="submit"
@@ -245,7 +297,7 @@ export default function CreateUserPage() {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}
                   >
                     <UsersIcon size={18} />
-                    {submitting ? 'Creating User…' : 'Create User'}
+                    {submitting ? 'Sending invitation…' : 'Create & Invite'}
                   </button>
                 </form>
               </div>
@@ -257,14 +309,29 @@ export default function CreateUserPage() {
                 <h2 className="card-title" style={{ margin: 0 }}>Reset Password</h2>
               </div>
               <div className="card-body">
-                {resetSent && (
+                {resetMessage && (
                   <div className="settings-alert success" style={{ marginBottom: '12px' }}>
-                    Recovery link sent via email successfully.
+                    {resetMessage}
                   </div>
                 )}
                 {resetError && (
                   <div className="settings-alert error" style={{ marginBottom: '16px' }}>
                     {resetError}
+                  </div>
+                )}
+                {resetFallbackUrl && (
+                  <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                      <strong>Reset link:</strong> share this with the user. It expires in 1 hour and works once.
+                    </div>
+                    <code style={{ fontSize: '0.78rem', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                      {resetFallbackUrl}
+                    </code>
+                    <div style={{ marginTop: '8px' }}>
+                      <button type="button" className="btn btn-ghost" onClick={() => copyLink(resetFallbackUrl)}>
+                        {copied ? 'Copied' : 'Copy link'}
+                      </button>
+                    </div>
                   </div>
                 )}
                 <form onSubmit={handleResetPassword}>
@@ -278,7 +345,10 @@ export default function CreateUserPage() {
                       onChange={e => setResetEmail(e.target.value)}
                       required
                     />
-                    <span className="form-hint">A reset link will be sent to this email</span>
+                    <span className="form-hint">
+                      A single-use link is emailed to this address. Sessions stay signed in
+                      until the link is used.
+                    </span>
                   </div>
                   <button
                     type="submit"
@@ -288,6 +358,45 @@ export default function CreateUserPage() {
                   >
                     <SaveIcon size={18} />
                     {resetting ? 'Sending Reset Link…' : 'Send Reset Link'}
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {/* Test Email Section */}
+            <div className="card">
+              <div className="card-header">
+                <h2 className="card-title" style={{ margin: 0 }}>Test Email</h2>
+              </div>
+              <div className="card-body">
+                {testResult && (
+                  <div className="settings-alert success" style={{ marginBottom: '12px' }}>{testResult}</div>
+                )}
+                {testError && (
+                  <div className="settings-alert error" style={{ marginBottom: '12px' }}>{testError}</div>
+                )}
+                <form onSubmit={handleTestEmail}>
+                  <div className="form-group">
+                    <label className="form-label">Send To</label>
+                    <input
+                      className="form-input"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={testEmail}
+                      onChange={e => setTestEmail(e.target.value)}
+                      required
+                    />
+                    <span className="form-hint">
+                      Confirms the Gmail API setup before you invite anyone.
+                    </span>
+                  </div>
+                  <button
+                    type="submit"
+                    className="btn btn-ghost"
+                    disabled={testing}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}
+                  >
+                    {testing ? 'Sending…' : 'Send Test Email'}
                   </button>
                 </form>
               </div>
@@ -359,14 +468,22 @@ export default function CreateUserPage() {
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                 <span>{a.first_name || a.last_name ? `${a.first_name} ${a.last_name}`.trim() : '—'}</span>
-                                {a.email_confirmed_at ? (
-                                  <span className="badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                {a.email_verified_at ? (
+                                  <span
+                                    className="badge badge-active"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                    title={`Email verified ${formatDate(a.email_verified_at)}`}
+                                  >
                                     <CheckIcon size={12} /> Verified
                                   </span>
-                                ) : isRecent(a.created_at) ? (
-                                  <span className="badge badge-new">New</span>
+                                ) : a.invited_at ? (
+                                  <span className="badge badge-new" title={`Invited ${formatDate(a.invited_at)}`}>
+                                    Invite pending
+                                  </span>
                                 ) : (
-                                  <span className="badge badge-dormant">Invited</span>
+                                  <span className="badge badge-dormant" title="Set up outside the invitation flow">
+                                    Active
+                                  </span>
                                 )}
                               </div>
                             </td>

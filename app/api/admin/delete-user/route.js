@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { oid } from '@/lib/db'
 import { modelsFor } from '@/lib/models'
 import { authUser } from '@/lib/auth'
+import { purgeAuthTokens } from '@/lib/auth-tokens'
 
 export async function POST(request) {
   try {
@@ -26,6 +27,7 @@ export async function POST(request) {
     }
 
     await Session.deleteMany({ user_id: target._id })
+    await purgeAuthTokens(target._id)
     await User.deleteOne({ _id: target._id })
 
     return NextResponse.json({ message: `User ${email} deleted successfully` })

@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import { useTheme } from '@/components/ThemeProvider'
 import { fetchUser } from '@/lib/api'
 import { parseDateValue, toDateOnlyString, membershipDateToYear, getStatusLabel } from '@/lib/utils'
+import { passwordProblem } from '@/lib/password-policy'
 import { memberDuplicateKey } from '@/lib/member-duplicate'
 import { SaveIcon, SunIcon, MoonIcon, UploadIcon, DownloadIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
 
@@ -214,8 +215,9 @@ export default function SettingsPage() {
           setSaving(false)
           return
         }
-        if (password.length < 6) {
-          setError('Password must be at least 6 characters')
+        const problem = passwordProblem(password)
+        if (problem) {
+          setError(problem)
           setSaving(false)
           return
         }
@@ -224,6 +226,12 @@ export default function SettingsPage() {
           setSaving(false)
           return
         }
+      }
+
+      if (email.trim().toLowerCase() !== (user.email || '').toLowerCase() && !currentPassword) {
+        setError('Current password is required to change the sign-in email')
+        setSaving(false)
+        return
       }
 
       const displayName = [firstName, lastName].filter(Boolean).join(' ').trim()
@@ -237,8 +245,11 @@ export default function SettingsPage() {
         updates.email = email
       }
 
-      if (password) {
+      if (currentPassword) {
         updates.current_password = currentPassword
+      }
+
+      if (password) {
         updates.password = password
       }
 
@@ -257,7 +268,7 @@ export default function SettingsPage() {
         setEmail(data.user.email || '')
       }
 
-      setMessage('Settings saved successfully')
+      setMessage('Settings saved. A confirmation email is on its way for any account change.')
       setCurrentPassword('')
       setPassword('')
       setConfirmPassword('')
@@ -682,7 +693,10 @@ export default function SettingsPage() {
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                     />
-                    <span className="form-hint">Changing email may require verification</span>
+                    <span className="form-hint">
+                      Changing the sign-in email requires your current password. Both the old
+                      and new address get a confirmation email.
+                    </span>
                   </div>
                 </div>
               </div>
@@ -702,6 +716,9 @@ export default function SettingsPage() {
                       onChange={e => setCurrentPassword(e.target.value)}
                       autoComplete="current-password"
                     />
+                    <span className="form-hint">
+                      Required to change your sign-in email or password.
+                    </span>
                   </div>
                   <div className="form-group">
                     <label className="form-label">New Password</label>
