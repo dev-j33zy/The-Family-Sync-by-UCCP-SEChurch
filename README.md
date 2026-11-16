@@ -141,6 +141,9 @@ per-email cost, roughly 2,000 messages/day per user).
    --manual`, open the printed URL yourself, and paste the address you land on
    — it still contains the code even though the page cannot load.
 
+   `node scripts/email-check.js you@example.com` sends a test message with the
+   credentials in `.env.local`, without needing to sign in to the app.
+
 6. Sign in as an administrator → **Admin Tools → Test Email** to confirm
    delivery end to end.
 
