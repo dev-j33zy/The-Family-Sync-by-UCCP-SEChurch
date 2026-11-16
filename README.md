@@ -136,6 +136,11 @@ per-email cost, roughly 2,000 messages/day per user).
    address the mailbox is allowed to send as. Copy the values into `.env.local`
    and into the Vercel project (Production).
 
+   If the browser never makes it back to `127.0.0.1:53682` (firewall, remote
+   session, browser on another machine), run `node scripts/gmail-auth.js
+   --manual`, open the printed URL yourself, and paste the address you land on
+   — it still contains the code even though the page cannot load.
+
 6. Sign in as an administrator → **Admin Tools → Test Email** to confirm
    delivery end to end.
 
