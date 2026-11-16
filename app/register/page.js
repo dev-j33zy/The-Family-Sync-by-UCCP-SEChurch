@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useRef } from 'react'
-import { calculateAge, renderDatePickerHeader, membershipYearToDate, membershipDateToYear, isValidMembershipYear } from '@/lib/utils'
+import { calculateAge, renderDatePickerHeader, membershipYearToDate, membershipDateToYear, isValidMembershipDate } from '@/lib/utils'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 
@@ -262,8 +262,8 @@ export default function RegisterPage() {
     setError('')
     setSuccessNote('')
 
-    if (!isValidMembershipYear(form.date_of_membership)) {
-      setError(`Year of membership must be between 1900 and ${new Date().getFullYear()}`)
+    if (!isValidMembershipDate(form.date_of_membership)) {
+      setError(`Membership date must be a year or full date between 1900 and ${new Date().getFullYear()}`)
       return
     }
 
@@ -801,11 +801,11 @@ export default function RegisterPage() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="date_of_membership">Year of Membership (Baptism Year)</label>
-                <input id="date_of_membership" type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
-                  className="form-input" placeholder="e.g. 2015" value={form.date_of_membership}
-                  onChange={e => set('date_of_membership', e.target.value.replace(/\D/g, '').slice(0, 4))} />
-                <span className="form-hint">The year you were baptized or became a member.</span>
+                <label className="form-label" htmlFor="date_of_membership">Date or Year of Membership (Baptism)</label>
+                <input id="date_of_membership" type="text" inputMode="numeric" maxLength={10}
+                  className="form-input" placeholder="e.g. 2015 or 2015-04-29" value={form.date_of_membership}
+                  onChange={e => set('date_of_membership', e.target.value.replace(/[^\d-]/g, '').slice(0, 10))} />
+                <span className="form-hint">A year is enough, or enter the full date you were baptized or became a member.</span>
               </div>
             </div>
           </div>

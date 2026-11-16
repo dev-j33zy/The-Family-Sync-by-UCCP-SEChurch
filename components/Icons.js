@@ -376,3 +376,12 @@ export function AlertCircleIcon(props) {
     </Icon>
   )
 }
+
+/* Material UI `filter_list`: three centred lines of decreasing width. */
+export function FilterIcon({ size = 20, className, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} style={style}>
+      <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" />
+    </svg>
+  )
+}

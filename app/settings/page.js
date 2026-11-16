@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx'
 import Sidebar from '@/components/Sidebar'
 import { useTheme } from '@/components/ThemeProvider'
 import { fetchUser } from '@/lib/api'
-import { parseDateValue, toDateOnlyString, membershipDateToYear } from '@/lib/utils'
+import { parseDateValue, toDateOnlyString, membershipDateToYear, getStatusLabel } from '@/lib/utils'
 import { memberDuplicateKey } from '@/lib/member-duplicate'
 import { SaveIcon, SunIcon, MoonIcon, UploadIcon, DownloadIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
 
@@ -862,7 +862,7 @@ export default function SettingsPage() {
                         <td className={!m.date_of_birth ? 'import-cell-missing' : ''}>{m.date_of_birth || '\u2014'}</td>
                         <td>{m.gender || '\u2014'}</td>
                         <td>{m.citizenship || '\u2014'}</td>
-                        <td>{m.membership_status || '\u2014'}</td>
+                        <td>{getStatusLabel(m.membership_status)}</td>
                         <td>{m.membership_type || '\u2014'}</td>
                         <td>{m.phone_number || '\u2014'}</td>
                         <td>{m.email_address || '\u2014'}</td>

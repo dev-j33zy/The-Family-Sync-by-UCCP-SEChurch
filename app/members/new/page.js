@@ -1,10 +1,10 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import { PlusIcon } from '@/components/Icons'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { todayDateString, membershipYearToDate, isValidMembershipYear } from '@/lib/utils'
+import { todayDateString, membershipYearToDate, isValidMembershipDate } from '@/lib/utils'
 
 const EMPTY_FORM = {
   first_name: '',
@@ -25,23 +25,13 @@ const EMPTY_FORM = {
   village: '',
   barangay: '',
   city: '',
-  family_group_id: '',
 }
 
 export default function NewMemberPage() {
   const router = useRouter()
   const [form, setForm] = useState({ ...EMPTY_FORM })
-  const [familyGroups, setFamilyGroups] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    async function loadGroups() {
-      const res = await fetch('/api/family-groups')
-      if (res.ok) setFamilyGroups(await res.json())
-    }
-    loadGroups()
-  }, [])
 
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -51,8 +41,8 @@ export default function NewMemberPage() {
     e.preventDefault()
     setError('')
 
-    if (!isValidMembershipYear(form.date_of_membership)) {
-      setError(`Year of membership must be between 1900 and ${new Date().getFullYear()}`)
+    if (!isValidMembershipDate(form.date_of_membership)) {
+      setError(`Membership date must be a year or full date between 1900 and ${new Date().getFullYear()}`)
       return
     }
 
@@ -189,18 +179,18 @@ export default function NewMemberPage() {
                       </select>
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="date_of_membership">Year of Membership (Baptism Year)</label>
-                      <input id="date_of_membership" type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
-                        className="form-input" placeholder="e.g. 2015" value={form.date_of_membership}
-                        onChange={e => set('date_of_membership', e.target.value.replace(/\D/g, '').slice(0, 4))} />
-                      <span className="form-hint">Setting this year marks the member as Active.</span>
+                      <label className="form-label" htmlFor="date_of_membership">Date or Year of Membership (Baptism)</label>
+                      <input id="date_of_membership" type="text" inputMode="numeric" maxLength={10}
+                        className="form-input" placeholder="e.g. 2015 or 2015-04-29" value={form.date_of_membership}
+                        onChange={e => set('date_of_membership', e.target.value.replace(/[^\d-]/g, '').slice(0, 10))} />
+                      <span className="form-hint">A year is enough, or enter the full date. Setting this marks the member as Active.</span>
                     </div>
                     <div className="form-group">
                       <label className="form-label" htmlFor="membership_status">Membership Status</label>
                       <select id="membership_status" className="form-select" value={form.date_of_membership ? projectedStatus : form.membership_status}
                         onChange={e => set('membership_status', e.target.value)}
                         disabled={!!form.date_of_membership && form.membership_status === 'new'}>
-                        <option value="new">New</option>
+                        <option value="new">Preparatory</option>
                         <option value="active">Active</option>
                         <option value="dormant">Dormant</option>
                         <option value="cancelled">Cancelled</option>
@@ -217,16 +207,6 @@ export default function NewMemberPage() {
                         <option value="regular">Regular</option>
                         <option value="associate">Associate</option>
                         <option value="affiliate">Affiliate</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="family_group_id">Family Group</label>
-                      <select id="family_group_id" className="form-select" value={form.family_group_id}
-                        onChange={e => set('family_group_id', e.target.value)}>
-                        <option value="">No family group</option>
-                        {(familyGroups || []).map(g => (
-                          <option key={g.id} value={g.id}>{g.name}</option>
-                        ))}
                       </select>
                     </div>
                   </div>

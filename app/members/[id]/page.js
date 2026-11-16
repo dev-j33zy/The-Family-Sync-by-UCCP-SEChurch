@@ -2,7 +2,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
-import { calculateAge, formatDate, capitalize, getFullName, getRelationshipLabel, membershipDateToYear } from '@/lib/utils'
+import { calculateAge, formatDate, capitalize, getFullName, getRelationshipLabel, membershipDateToInput, getStatusLabel } from '@/lib/utils'
 import { PlusIcon, EditIcon, TrashIcon, TreeIcon, FrownIcon } from '@/components/Icons'
 import Link from 'next/link'
 
@@ -18,6 +18,13 @@ function DetailField({ label, value }) {
 function getCombinedAddress(member) {
   const parts = [member.street_address, member.village, member.barangay, member.city]
   return parts.filter(Boolean).join(', ') || null
+}
+
+/** A stored January 1 means only the year was recorded; anything else is a full date. */
+function getMembershipDisplay(value) {
+  if (!value) return null
+  const input = membershipDateToInput(value)
+  return input.length > 4 ? formatDate(input) : input
 }
 
 function getRelatedName(rel) {
@@ -139,11 +146,10 @@ export default function MemberDetailPage({ params }) {
                     </div>
                   )}
                   <div className="member-detail-meta">
-                    {member.family_groups?.name && <span>{member.family_groups.name} · </span>}
                     {age} years old · {capitalize(member.gender)}
                   </div>
                   <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    <span className={`badge badge-${member.membership_status}`}>{capitalize(member.membership_status)}</span>
+                    <span className={`badge badge-${member.membership_status}`}>{getStatusLabel(member.membership_status)}</span>
                     {member.membership_type && (
                       <span className={`badge badge-${member.membership_type}`}>{capitalize(member.membership_type)}</span>
                     )}
@@ -160,7 +166,6 @@ export default function MemberDetailPage({ params }) {
 
               {/* Details grid */}
               <div className="detail-grid">
-                <DetailField label="Family Group" value={member.family_groups?.name} />
                 <DetailField label="Spouse" value={spouseName} />
                 <DetailField label="Date of Birth" value={formatDate(member.date_of_birth)} />
                 <DetailField label="Citizenship" value={member.citizenship} />
@@ -169,7 +174,7 @@ export default function MemberDetailPage({ params }) {
                   <DetailField label="Wedding Anniversary" value={formatDate(member.wedding_anniversary)} />
                 )}
                 <DetailField label="Communicant Class Graduate" value={member.communicant_class_graduate} />
-                <DetailField label="Date of Membership" value={member.date_of_membership ? membershipDateToYear(member.date_of_membership) : null} />
+                <DetailField label="Date of Membership" value={getMembershipDisplay(member.date_of_membership)} />
                 <DetailField label="Registered" value={member.registered_at ? formatDate(member.registered_at) : null} />
               </div>
 

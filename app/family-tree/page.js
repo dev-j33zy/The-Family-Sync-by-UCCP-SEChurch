@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import Sidebar from '@/components/Sidebar'
-import { calculateAge, getFullName, getRelationshipLabel, capitalize, renderDatePickerHeader } from '@/lib/utils'
+import { calculateAge, getFullName, getRelationshipLabel, getStatusLabel, renderDatePickerHeader } from '@/lib/utils'
 
 import { PlusIcon, TreeIcon } from '@/components/Icons'
 import Link from 'next/link'
@@ -54,7 +54,7 @@ function TreeCard({ member, isCenter = false, label, onClick, onRemove }) {
         {isCenter && (
           <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'center' }}>
             <span className={`badge badge-${member.membership_status}`} style={{ fontSize: '0.65rem', padding: '2px 8px' }}>
-              {capitalize(member.membership_status)}
+              {getStatusLabel(member.membership_status)}
             </span>
           </div>
         )}

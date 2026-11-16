@@ -1,8 +1,8 @@
 'use client'
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { calculateAge, capitalize, membershipDateToYear } from '@/lib/utils'
-import { SearchIcon, UsersIcon, EyeIcon, EditIcon, TrashIcon } from '@/components/Icons'
+import { calculateAge, capitalize, membershipDateToYear, getStatusLabel } from '@/lib/utils'
+import { SearchIcon, UsersIcon, EyeIcon, EditIcon, TrashIcon, FilterIcon } from '@/components/Icons'
 
 function SortIcon({ field, currentField, direction }) {
   if (currentField !== field) return <span style={{ opacity: 0.3 }}>↕</span>
@@ -25,13 +25,20 @@ export default function MemberTable({ members, onDelete }) {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterGender, setFilterGender] = useState('')
-  const [filterAddressArea, setFilterAddressArea] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [sortField, setSortField] = useState('last_name')
   const [sortDir, setSortDir] = useState('asc')
 
   function handleSort(field) {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('asc') }
+  }
+
+  function clearFilters() {
+    setSearch('')
+    setFilterStatus('')
+    setFilterType('')
+    setFilterGender('')
   }
 
   const filtered = useMemo(() => {
@@ -44,19 +51,16 @@ export default function MemberTable({ members, onDelete }) {
         m.middle_name?.toLowerCase().includes(q) ||
         m.member_code?.toLowerCase().includes(q) ||
         String(calculateAge(m.date_of_birth) ?? '').includes(q) ||
-        m.citizenship?.toLowerCase().includes(q)
+        m.citizenship?.toLowerCase().includes(q) ||
+        m.street_address?.toLowerCase().includes(q) ||
+        m.village?.toLowerCase().includes(q) ||
+        m.barangay?.toLowerCase().includes(q) ||
+        m.city?.toLowerCase().includes(q)
       )
     }
     if (filterStatus) list = list.filter(m => m.membership_status === filterStatus)
     if (filterType) list = list.filter(m => m.membership_type === filterType)
     if (filterGender) list = list.filter(m => m.gender === filterGender)
-    if (filterAddressArea) {
-      const q = filterAddressArea.toLowerCase()
-      list = list.filter(m => {
-        const area = [m.village, m.barangay].filter(Boolean).join(', ').toLowerCase()
-        return area.includes(q)
-      })
-    }
 
     list.sort((a, b) => {
       let aVal = a[sortField] || ''
@@ -71,7 +75,7 @@ export default function MemberTable({ members, onDelete }) {
       return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
     })
     return list
-  }, [members, search, filterStatus, filterType, filterGender, filterAddressArea, sortField, sortDir])
+  }, [members, search, filterStatus, filterType, filterGender, sortField, sortDir])
 
   return (
     <div className="member-list-view">
@@ -82,43 +86,47 @@ export default function MemberTable({ members, onDelete }) {
           <input
             id="member-search"
             className="form-input search-input"
-            placeholder="Search by name, ID, age, or citizenship…"
+            placeholder="Search by name, ID, age, citizenship, or address…"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <input
-          className="form-input filter-select"
-          placeholder="Address area (village/barangay)"
-          value={filterAddressArea}
-          onChange={e => setFilterAddressArea(e.target.value)}
-        />
-        <select id="filter-status" className="form-select filter-select filter-dropdown" value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value)}>
-          <option value="">Membership Status</option>
-          <option value="new">New</option>
-          <option value="active">Active</option>
-          <option value="dormant">Dormant</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <select id="filter-type" className="form-select filter-select filter-dropdown" value={filterType}
-          onChange={e => setFilterType(e.target.value)}>
-          <option value="">Membership Type</option>
-          <option value="regular">Regular</option>
-          <option value="associate">Associate</option>
-          <option value="affiliate">Affiliate</option>
-        </select>
-        <select id="filter-gender" className="form-select filter-select filter-dropdown" value={filterGender}
-          onChange={e => setFilterGender(e.target.value)}>
-          <option value="">All Genders</option>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-        </select>
-        {(search || filterStatus || filterType || filterGender || filterAddressArea) && (
-          <button className="btn btn-ghost btn-sm" onClick={() => {
-            setSearch(''); setFilterStatus(''); setFilterType(''); setFilterGender(''); setFilterAddressArea('')
-          }}>Clear</button>
-        )}
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon filter-toggle"
+          aria-label={filtersOpen ? 'Hide filters' : 'Show filters'}
+          aria-expanded={filtersOpen}
+          aria-controls="member-filters"
+          onClick={() => setFiltersOpen(open => !open)}
+        >
+          <FilterIcon size={18} />
+        </button>
+        <div id="member-filters" className={`member-filters${filtersOpen ? ' open' : ''}`}>
+          <select id="filter-status" className="form-select filter-select filter-dropdown" value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}>
+            <option value="">Membership Status</option>
+            <option value="new">Preparatory</option>
+            <option value="active">Active</option>
+            <option value="dormant">Dormant</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <select id="filter-type" className="form-select filter-select filter-dropdown" value={filterType}
+            onChange={e => setFilterType(e.target.value)}>
+            <option value="">Membership Type</option>
+            <option value="regular">Regular</option>
+            <option value="associate">Associate</option>
+            <option value="affiliate">Affiliate</option>
+          </select>
+          <select id="filter-gender" className="form-select filter-select filter-dropdown" value={filterGender}
+            onChange={e => setFilterGender(e.target.value)}>
+            <option value="">All Genders</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+          {(search || filterStatus || filterType || filterGender) && (
+            <button className="btn btn-ghost btn-sm" onClick={clearFilters}>Clear</button>
+          )}
+        </div>
       </div>
 
       {/* Results count */}
@@ -182,7 +190,7 @@ export default function MemberTable({ members, onDelete }) {
                   <td className="mobile-hide" style={{ color: 'var(--text-secondary)' }}>{member.citizenship || '—'}</td>
                   <td className="mobile-hide">
                     <span className={`badge badge-${member.membership_status}`}>
-                      {capitalize(member.membership_status)}
+                      {getStatusLabel(member.membership_status)}
                     </span>
                   </td>
                   <td className="mobile-hide">

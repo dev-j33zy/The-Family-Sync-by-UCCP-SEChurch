@@ -3,7 +3,7 @@ import { useState, useEffect, use } from 'react'
 import Sidebar from '@/components/Sidebar'
 import { SaveIcon } from '@/components/Icons'
 import { useRouter } from 'next/navigation'
-import { getFullName, todayDateString, membershipYearToDate, membershipDateToYear, isValidMembershipYear } from '@/lib/utils'
+import { getFullName, todayDateString, membershipYearToDate, membershipDateToInput, isValidMembershipDate } from '@/lib/utils'
 import { FrownIcon } from '@/components/Icons'
 import Link from 'next/link'
 
@@ -26,7 +26,6 @@ const EMPTY_FORM = {
   village: '',
   barangay: '',
   city: '',
-  family_group_id: '',
 }
 
 function toFormMember(m) {
@@ -41,7 +40,7 @@ function toFormMember(m) {
     relationship_status: m.relationship_status || '',
     wedding_anniversary: m.wedding_anniversary ? String(m.wedding_anniversary).slice(0, 10) : '',
     communicant_class_graduate: m.communicant_class_graduate || '',
-    date_of_membership: membershipDateToYear(m.date_of_membership),
+    date_of_membership: membershipDateToInput(m.date_of_membership),
     membership_status: m.membership_status || 'new',
     membership_type: m.membership_type || '',
     phone_number: m.phone_number || '',
@@ -50,7 +49,6 @@ function toFormMember(m) {
     village: m.village || '',
     barangay: m.barangay || '',
     city: m.city || '',
-    family_group_id: m.family_group_id || '',
   }
 }
 
@@ -58,7 +56,6 @@ export default function EditMemberPage({ params }) {
   const { id } = use(params)
   const router = useRouter()
   const [member, setMember] = useState(null)
-  const [familyGroups, setFamilyGroups] = useState([])
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -66,16 +63,12 @@ export default function EditMemberPage({ params }) {
 
   useEffect(() => {
     async function load() {
-      const [mRes, gRes] = await Promise.all([
-        fetch(`/api/members/${id}`, { cache: 'no-store' }),
-        fetch('/api/family-groups'),
-      ])
+      const mRes = await fetch(`/api/members/${id}`, { cache: 'no-store' })
       if (mRes.ok) {
         const m = await mRes.json()
         setMember(m)
         setForm(toFormMember(m))
       }
-      if (gRes.ok) setFamilyGroups(await gRes.json())
       setLoading(false)
     }
     load()
@@ -89,20 +82,20 @@ export default function EditMemberPage({ params }) {
     e.preventDefault()
     setError('')
 
-    if (!isValidMembershipYear(form.date_of_membership)) {
-      setError(`Year of membership must be between 1900 and ${new Date().getFullYear()}`)
+    if (!isValidMembershipDate(form.date_of_membership)) {
+      setError(`Membership date must be a year or full date between 1900 and ${new Date().getFullYear()}`)
       return
     }
 
     setSaving(true)
 
-    // A year is the only thing the form collects now. If the year did not
-    // change, keep the exact date already on record (records imported with a
-    // full date must not silently shift to January 1). A changed year becomes
-    // January 1 of that year.
-    const originalYear = member ? membershipDateToYear(member.date_of_membership) : ''
+    // The field accepts a year or a full date. If it was not changed, keep the
+    // exact date already on record (records imported with a full date must not
+    // silently shift to January 1). Otherwise keep a full date as entered and
+    // turn a bare year into January 1 of that year.
+    const originalInput = member ? membershipDateToInput(member.date_of_membership) : ''
     const dateOfMembership = form.date_of_membership
-      ? form.date_of_membership === originalYear
+      ? form.date_of_membership === originalInput
         ? String(member.date_of_membership).slice(0, 10)
         : membershipYearToDate(form.date_of_membership)
       : ''
@@ -236,18 +229,18 @@ export default function EditMemberPage({ params }) {
                         </select>
                       </div>
                       <div className="form-group">
-                        <label className="form-label" htmlFor="date_of_membership">Year of Membership (Baptism Year)</label>
-                        <input id="date_of_membership" type="text" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
-                          className="form-input" placeholder="e.g. 2015" value={form.date_of_membership}
-                          onChange={e => set('date_of_membership', e.target.value.replace(/\D/g, '').slice(0, 4))} />
-                        <span className="form-hint">Setting this year marks the member as Active.</span>
+                        <label className="form-label" htmlFor="date_of_membership">Date or Year of Membership (Baptism)</label>
+                        <input id="date_of_membership" type="text" inputMode="numeric" maxLength={10}
+                          className="form-input" placeholder="e.g. 2015 or 2015-04-29" value={form.date_of_membership}
+                          onChange={e => set('date_of_membership', e.target.value.replace(/[^\d-]/g, '').slice(0, 10))} />
+                        <span className="form-hint">A year is enough, or enter the full date. Setting this marks the member as Active.</span>
                       </div>
                       <div className="form-group">
                         <label className="form-label" htmlFor="membership_status">Membership Status</label>
                         <select id="membership_status" className="form-select" value={form.date_of_membership ? projectedStatus : form.membership_status}
                           onChange={e => set('membership_status', e.target.value)}
                           disabled={!!form.date_of_membership && form.membership_status === 'new'}>
-                          <option value="new">New</option>
+                          <option value="new">Preparatory</option>
                           <option value="active">Active</option>
                           <option value="dormant">Dormant</option>
                           <option value="cancelled">Cancelled</option>
@@ -264,16 +257,6 @@ export default function EditMemberPage({ params }) {
                           <option value="regular">Regular</option>
                           <option value="associate">Associate</option>
                           <option value="affiliate">Affiliate</option>
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="family_group_id">Family Group</label>
-                        <select id="family_group_id" className="form-select" value={form.family_group_id}
-                          onChange={e => set('family_group_id', e.target.value)}>
-                          <option value="">No family group</option>
-                          {(familyGroups || []).map(g => (
-                            <option key={g.id} value={g.id}>{g.name}</option>
-                          ))}
                         </select>
                       </div>
                     </div>

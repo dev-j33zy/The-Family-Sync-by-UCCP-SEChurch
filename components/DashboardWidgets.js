@@ -28,7 +28,7 @@ export function StatsCards({ stats }) {
     },
     {
       key: 'new',
-      label: 'New Members',
+      label: 'Preparatory Members',
       icon: StarIcon,
       value: stats.new,
       cardClass: 'stat-card-new',
@@ -89,6 +89,9 @@ export function BirthdayCalendar({ members }) {
   const cells = []
   for (let i = 0; i < firstDay; i++) cells.push(null)
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  // Always fill six rows (42 cells). A month that only needs five weeks would
+  // otherwise make the card shorter and pull the legend up with it.
+  while (cells.length < 42) cells.push(null)
 
   const hoveredDayEvents = hoveredDay ? (events[hoveredDay] || []) : []
 
