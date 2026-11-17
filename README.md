@@ -142,7 +142,19 @@ per-email cost, roughly 2,000 messages/day per user).
    If the browser never makes it back to `127.0.0.1:53682` (firewall, remote
    session, browser on another machine), run `npm run google-auth --
    --manual`, open the printed URL yourself, and paste the address you land on
-   — it still contains the code even though the page cannot load.
+   - it still contains the code even though the page cannot load.
+
+   If Google answers with **"The server cannot process the request because it
+   is malformed"**, the link is fine (the script checks it with Google before
+   opening anything) - the browser session is not. Run it in a clean private
+   window with only the church account:
+
+   ```bash
+   npm run google-auth -- --incognito
+   ```
+
+   `--no-open` prints the URL without launching a browser, so it can be pasted
+   into a private window by hand.
 
    `node scripts/email-check.js you@example.com` sends a test message with the
    credentials in `.env.local`, without needing to sign in to the app.
