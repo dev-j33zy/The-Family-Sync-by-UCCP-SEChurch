@@ -370,7 +370,11 @@ async function report(tokens) {
   console.log(`GMAIL_CLIENT_ID=${clientId}`)
   console.log(`GMAIL_CLIENT_SECRET=${clientSecret}`)
   console.log(`GMAIL_REFRESH_TOKEN=${tokens.refresh_token}`)
-  console.log('EMAIL_FROM="The Family Sync <no-reply@your-domain.example>"')
+  // Keep whatever EMAIL_FROM is already configured: it must be an address this
+  // mailbox is allowed to send as, and the placeholder below is not.
+  console.log(
+    `EMAIL_FROM="${process.env.EMAIL_FROM || 'The Family Sync <mailbox@your-domain.example>'}"`
+  )
   console.log(
     `NEXT_PUBLIC_APP_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://your-app.vercel.app'}`
   )
