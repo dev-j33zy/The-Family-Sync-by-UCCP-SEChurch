@@ -732,7 +732,7 @@ export default function SettingsPage() {
                   <div className="export-controls">
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="btn btn-ghost"
                       onClick={handleExportPdf}
                       disabled={!!exporting}
                     >
@@ -741,7 +741,7 @@ export default function SettingsPage() {
                     </button>
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="btn btn-ghost"
                       onClick={handleExportSheets}
                       disabled={!!exporting}
                     >
@@ -750,7 +750,7 @@ export default function SettingsPage() {
                     </button>
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="btn btn-ghost"
                       onClick={() => handleExportWorkbook('xlsx')}
                       disabled={!!exporting}
                     >
@@ -759,7 +759,7 @@ export default function SettingsPage() {
                     </button>
                     <button
                       type="button"
-                      className="btn btn-secondary"
+                      className="btn btn-ghost"
                       onClick={() => handleExportWorkbook('csv')}
                       disabled={!!exporting}
                     >
