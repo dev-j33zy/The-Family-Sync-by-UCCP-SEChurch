@@ -415,6 +415,59 @@ export function GoogleSheetsIcon({ size = 20, className, style }) {
   )
 }
 
+export function ExcelFileIcon({ size = 20, className, style }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      style={style}
+      aria-hidden="true"
+    >
+      <path
+        fill="#1d6f42"
+        d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"
+      />
+      <path fill="#8ed1a8" d="M14.5 2v5.5H20L14.5 2Z" />
+      <g stroke="#fff" strokeWidth="1.7" strokeLinecap="round">
+        <line x1="8.4" y1="11.4" x2="12.4" y2="16" />
+        <line x1="12.4" y1="11.4" x2="8.4" y2="16" />
+      </g>
+    </svg>
+  )
+}
+
+export function CsvFileIcon({ size = 20, className, style }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      style={style}
+      aria-hidden="true"
+    >
+      <path
+        fill="#5f6368"
+        d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"
+      />
+      <path fill="#bdc1c6" d="M14.5 2v5.5H20L14.5 2Z" />
+      <text
+        x="11.5"
+        y="16"
+        textAnchor="middle"
+        fontSize="4.2"
+        fontWeight="700"
+        fontFamily="Helvetica, Arial, sans-serif"
+        fill="#fff"
+      >
+        CSV
+      </text>
+    </svg>
+  )
+}
+
 export function FileIcon(props) {
   return (
     <Icon {...props}>

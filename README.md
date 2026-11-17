@@ -8,7 +8,7 @@ A full-stack church family membership management web app built with **Next.js 16
 
 - **Dashboard** — stats cards, birthday/anniversary calendar, 7-day reminders
 - **Members** — full CRUD, search, filter, sort, communicant class tracking
-- **Export** — masterlist as a print-ready PDF or as a Google Sheet created in the church account's Drive
+- **Export** — masterlist as a print-ready PDF, an Excel or CSV file, or a Google Sheet created in the church account's Drive
 - **Profile Photos** — upload, crop to square, compress under 1MB, expand preview with replace/edit/delete
 - **Family Tree** — interactive visualization with spouse, sibling, parent, child, and grandchild relationships
 - **Admin Tools** — invite users by email, send password-reset links, delete users, test email delivery, list registered admins
@@ -30,7 +30,7 @@ A full-stack church family membership management web app built with **Next.js 16
   Models live in `lib/models/`; `lib/models/index.js` exposes `modelsFor(domain)`, and `lib/db.js` holds one cached connection per domain. Cross-cluster `populate()` is not supported, so references between clusters (e.g. a blast's `created_by`) are resolved with a second query. Date-only fields (`date_of_birth`, `wedding_anniversary`, `date_of_membership`) are stored at **UTC midnight** and written through `parseDateOnly()`, so the API returns the same calendar day whatever the server timezone (local dev in UTC+8, Vercel in UTC).
 - **Auth**: sessions signed in `lib/auth.js`, verified on every API route; no external auth provider.
 - **Email**: `lib/email.js` sends through the Gmail API with a Workspace refresh token; `lib/auth-tokens.js` issues single-use invite/reset links (hashed in the admin cluster, 48 h for invites, 1 h for resets).
-- **Export**: `lib/member-export.js` defines the masterlist columns once; the settings page renders them with jsPDF in the browser, and `app/api/export/sheets/route.js` writes the same rows into a new spreadsheet through the Sheets API.
+- **Export**: `lib/member-export.js` defines the masterlist columns once; the settings page renders them with jsPDF or writes them with SheetJS (Excel/CSV) in the browser, and `app/api/export/sheets/route.js` writes the same rows into a new spreadsheet through the Sheets API.
 - **Desktop widget**: Electron app that signs in with a Family Sync account and reads birthdays/anniversaries from `/api/widget/events`; no database credentials on the client.
 - **MongoDB only**: every read and write goes through the three Atlas clusters above. There is no Postgres/Supabase runtime, SDK, or connection string in the app.
 
@@ -165,7 +165,7 @@ If an invitation cannot be delivered (misconfiguration, Gmail rejection) the
 Admin Tools page shows the link so it can be passed along by hand. Public
 "forgot password" never reveals whether an address has an account.
 
-## Export (PDF and Google Sheets)
+## Export (PDF, Excel, CSV and Google Sheets)
 
 **Settings → Data Management** has one button per format — no dropdown:
 
@@ -173,15 +173,17 @@ Admin Tools page shows the link so it can be passed along by hand. Public
 |---|---|
 | **Export PDF** | Renders the masterlist with jsPDF in the browser (landscape A4, repeating column headers, page numbers) and downloads `SEC Membership Masterlist (MM-DD-YYYY).pdf`. Nothing is uploaded. |
 | **Export to Google Sheets** | Creates a spreadsheet with that same name in the authorized mailbox's Drive, fills its `Members` sheet, shares it with the signed-in administrator, and opens it in a new tab. |
+| **Export Excel** | Downloads the masterlist as `.xlsx` with sensible column widths. |
+| **Export CSV** | Downloads the same rows as `.csv` for other tools. |
 
-Both buttons read the column list in `lib/member-export.js`, so the two outputs
-cannot drift apart. The sheet keeps stored values (`new`, `active`, …) so an
-export can be re-imported unchanged; the PDF shows the display labels
-("Preparatory"). The Sheets button needs the Google setup above — the Sheets and
-Drive APIs enabled and a refresh token minted after those scopes were added. If
-that is missing the request fails with a message naming the step, not a silent
-error. Every export is a new file owned by the church mailbox; the administrator
-also gets a share, so it appears in their own Drive too.
+All four buttons read the column list in `lib/member-export.js`, so the outputs
+cannot drift apart. Excel, CSV and Sheets keep the stored values (`new`,
+`active`, …) so an export can be re-imported unchanged; the PDF shows the
+display labels ("Preparatory"). The Sheets button needs the Google setup above —
+the Sheets and Drive APIs enabled and a refresh token minted after those scopes
+were added. If that is missing the request fails with a message naming the step,
+not a silent error. Every sheet export is a new file owned by the church mailbox;
+the administrator also gets a share, so it appears in their own Drive too.
 
 ## Desktop Widget
 

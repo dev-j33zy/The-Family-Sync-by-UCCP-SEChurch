@@ -9,7 +9,7 @@ import { parseDateValue, toDateOnlyString, getStatusLabel } from '@/lib/utils'
 import { passwordProblem } from '@/lib/password-policy'
 import { memberDuplicateKey } from '@/lib/member-duplicate'
 import { memberExportMatrix, memberExportTitle } from '@/lib/member-export'
-import { SaveIcon, SunIcon, MoonIcon, UploadIcon, PdfFileIcon, GoogleSheetsIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
+import { SaveIcon, SunIcon, MoonIcon, UploadIcon, PdfFileIcon, GoogleSheetsIcon, ExcelFileIcon, CsvFileIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
 
 const COLUMN_MAP = {
   'last name': 'last_name',
@@ -543,6 +543,54 @@ export default function SettingsPage() {
     setExporting(null)
   }
 
+  // Excel and CSV share the spreadsheet rows: same headers, same stored
+  // values, so either file can be re-imported through the importer above.
+  async function handleExportWorkbook(format) {
+    setExporting(format)
+    setError(null)
+    setExportProgress({ message: 'Fetching members\u2026', percent: 20 })
+
+    try {
+      const res = await fetch('/api/members')
+      const members = await res.json()
+      if (!res.ok) throw new Error(members.error || 'Failed to fetch members')
+      if (!members.length) throw new Error('There are no members to export yet.')
+
+      setExportProgress({ message: 'Building the file\u2026', percent: 65 })
+
+      const matrix = memberExportMatrix(members)
+      const ws = XLSX.utils.aoa_to_sheet(matrix)
+
+      // Readable column widths when the file is opened in Excel; ignored by CSV.
+      ws['!cols'] = matrix[0].map((label, column) => {
+        const longest = matrix.slice(1, 200).reduce(
+          (width, row) => Math.max(width, String(row[column] ?? '').length),
+          label.length
+        )
+        return { wch: Math.min(40, longest + 2) }
+      })
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Members')
+
+      setExportProgress({ message: 'Saving\u2026', percent: 90 })
+      const title = memberExportTitle()
+      XLSX.writeFile(wb, `${title}.${format}`, { bookType: format })
+
+      setExportProgress({ message: 'Done!', percent: 100 })
+      setTimeout(() => {
+        setExportProgress(null)
+        setMessage(
+          `Exported ${members.length} member${members.length !== 1 ? 's' : ''} as ${format === 'csv' ? 'CSV' : 'an Excel workbook'}.`
+        )
+      }, 500)
+    } catch (err) {
+      setError(err.message)
+      setExportProgress(null)
+    }
+    setExporting(null)
+  }
+
   async function handleExportSheets() {
     // Opened during the click (before any await) so the popup blocker lets it
     // through; it is pointed at the new sheet once Google answers.
@@ -678,8 +726,8 @@ export default function SettingsPage() {
                   </div>
                   <h3 className="import-export-title">Export Members</h3>
                   <p className="import-export-desc">
-                    Download a print-ready PDF of the masterlist, or create a Google Sheet in the
-                    church account&apos;s Drive and open it.
+                    Download a print-ready PDF, an Excel or CSV file, or create a Google Sheet in
+                    the church account&apos;s Drive and open it.
                   </p>
                   <div className="export-controls">
                     <button
@@ -699,6 +747,24 @@ export default function SettingsPage() {
                     >
                       <GoogleSheetsIcon size={16} />
                       {exporting === 'sheets' ? 'Exporting\u2026' : 'Export to Google Sheets'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleExportWorkbook('xlsx')}
+                      disabled={!!exporting}
+                    >
+                      <ExcelFileIcon size={16} />
+                      {exporting === 'xlsx' ? 'Exporting\u2026' : 'Export Excel'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleExportWorkbook('csv')}
+                      disabled={!!exporting}
+                    >
+                      <CsvFileIcon size={16} />
+                      {exporting === 'csv' ? 'Exporting\u2026' : 'Export CSV'}
                     </button>
                   </div>
                   {exportProgress && (
