@@ -620,10 +620,15 @@ export default function SettingsPage() {
         window.location.href = data.url
       }
 
-      const note = data.shared
-        ? ''
-        : ' It is owned by the church Google account, so open it there if the link asks for access.'
-      setMessage(`Created \u201c${data.title}\u201d with ${data.rows} member${data.rows !== 1 ? 's' : ''}.${note}`)
+      const accessNote =
+        data.access === 'public'
+          ? ' Anyone with the link can view it.'
+          : data.access === 'domain'
+            ? ` Anyone signed in to ${data.domain} with the link can view it.`
+            : data.shared
+              ? ''
+              : ' It is owned by the church Google account, so open it there if the link asks for access.'
+      setMessage(`Created \u201c${data.title}\u201d with ${data.rows} member${data.rows !== 1 ? 's' : ''}.${accessNote}`)
       setTimeout(() => setExportProgress(null), 1200)
     } catch (err) {
       if (tab) tab.close()

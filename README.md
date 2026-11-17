@@ -184,7 +184,7 @@ Admin Tools page shows the link so it can be passed along by hand. Public
 | Button | What it does |
 |---|---|
 | **Export PDF** | Renders the masterlist with jsPDF in the browser (landscape A4, repeating column headers, page numbers) and downloads `SEC Membership Masterlist (MM-DD-YYYY).pdf`. Nothing is uploaded. |
-| **Export to Google Sheets** | Creates a spreadsheet with that same name in the authorized mailbox's Drive, fills its `Members` sheet, shares it with the signed-in administrator, and opens it in a new tab. |
+| **Export to Google Sheets** | Creates a spreadsheet with that same name in the authorized mailbox's Drive, fills its `Members` sheet, shares it with the signed-in administrator, opens it in a new tab, and gives view access to everyone in the church Workspace domain (link only, not public). |
 | **Export Excel** | Downloads the masterlist as `.xlsx` with sensible column widths. |
 | **Export CSV** | Downloads the same rows as `.csv` for other tools. |
 
@@ -194,8 +194,23 @@ cannot drift apart. Excel, CSV and Sheets keep the stored values (`new`,
 display labels ("Preparatory"). The Sheets button needs the Google setup above —
 the Sheets and Drive APIs enabled and a refresh token minted after those scopes
 were added. If that is missing the request fails with a message naming the step,
-not a silent error. Every sheet export is a new file owned by the church mailbox;
-the administrator also gets a share, so it appears in their own Drive too.
+not a silent error.
+
+Every sheet export is a new file owned by the church mailbox. Two grants are set
+on it: the administrator who clicked Export gets write access, and link access
+lets colleagues open it without being granted one by one. Link access is
+controlled by `EXPORT_SHARE`:
+
+| `EXPORT_SHARE` | Who can open the link |
+|---|---|
+| `domain` (default) | Anyone signed in to the church Workspace account (the domain is taken from `EMAIL_FROM`, or `EXPORT_SHARE_DOMAIN` if set) |
+| `public` | Anyone with the URL, signed in or not — member data is personal information, so use this only with a deliberate decision |
+| `admin` | Only accounts explicitly shared with; no link access |
+
+Link access is always `allowFileDiscovery: false`, so the file never appears in
+anyone's Drive search — it is reachable only by someone holding the URL. If a
+grant fails (Workspace sharing policy, for example) the export still succeeds and
+the confirmation names the remaining access.
 
 ## Desktop Widget
 

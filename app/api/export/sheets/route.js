@@ -21,6 +21,34 @@ import { googleAccessToken, googleRequest } from '@/lib/google-auth'
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets'
 const DRIVE_FILES = 'https://www.googleapis.com/drive/v3/files'
 
+// Who may open an exported sheet. The administrator who clicks Export always
+// gets write access to the file itself; this controls link access for everyone
+// else.
+//
+//   domain (default) — anyone signed in to the church Workspace who has the
+//                      link can view it. No individual grant, nothing public.
+//   public           — anyone with the link can view it, signed in or not.
+//                      The masterlist is personal information, so this is
+//                      opt-in only (EXPORT_SHARE=public).
+//   admin            — no link access; every recipient needs an explicit share.
+const SHARE_MODE = String(process.env.EXPORT_SHARE || 'domain').trim().toLowerCase()
+
+/**
+ * Domain used for link sharing: EXPORT_SHARE_DOMAIN when set, otherwise the
+ * domain of the sending mailbox in EMAIL_FROM.
+ */
+function shareDomain() {
+  const override = String(process.env.EXPORT_SHARE_DOMAIN || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^@/, '')
+  if (override) return override
+
+  const address = (/<([^>]+)>/.exec(process.env.EMAIL_FROM || '')?.[1] || '').trim().toLowerCase()
+  const at = address.lastIndexOf('@')
+  return at > 0 ? address.slice(at + 1) : null
+}
+
 export const dynamic = 'force-dynamic'
 
 function setupResponse(err) {
@@ -124,11 +152,53 @@ export async function POST(request) {
       }
     }
 
+    // Link access for colleagues, so nobody has to be granted individually.
+    // allowFileDiscovery:false keeps the file out of Drive search — it is
+    // reachable only by someone holding the URL. Failures never fail the
+    // export: the file still exists in the church Drive and the administrator
+    // still has their own grant.
+    let access = null
+    let accessDomain = null
+
+    if (SHARE_MODE === 'public') {
+      try {
+        await googleRequest(`${DRIVE_FILES}/${spreadsheetId}/permissions?sendNotificationEmail=false`, {
+          token,
+          method: 'POST',
+          body: JSON.stringify({ type: 'anyone', role: 'reader', allowFileDiscovery: false }),
+        })
+        access = 'public'
+      } catch (err) {
+        console.error('sheets public link error:', err.message)
+      }
+    } else if (SHARE_MODE === 'domain') {
+      const domain = shareDomain()
+      if (!domain) {
+        console.warn(
+          'sheets export: link sharing needs a domain — set EXPORT_SHARE_DOMAIN or put a mailbox address in EMAIL_FROM'
+        )
+      } else {
+        try {
+          await googleRequest(`${DRIVE_FILES}/${spreadsheetId}/permissions?sendNotificationEmail=false`, {
+            token,
+            method: 'POST',
+            body: JSON.stringify({ type: 'domain', role: 'reader', domain, allowFileDiscovery: false }),
+          })
+          access = 'domain'
+          accessDomain = domain
+        } catch (err) {
+          console.error('sheets domain link error:', err.message)
+        }
+      }
+    }
+
     return NextResponse.json({
       url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
       title,
       rows: members.length,
       shared,
+      access,
+      domain: accessDomain,
     })
   } catch (err) {
     console.error('sheets export error:', err)
