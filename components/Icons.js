@@ -358,6 +358,63 @@ export function DownloadIcon(props) {
   )
 }
 
+// Brand marks for the export buttons. Unlike the stroke icons above these keep
+// their own colours, so they are not wrapped in <Icon>.
+
+export function PdfFileIcon({ size = 20, className, style }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      style={style}
+      aria-hidden="true"
+    >
+      <path
+        fill="#d93025"
+        d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"
+      />
+      <path fill="#f28b82" d="M14.5 2v5.5H20L14.5 2Z" />
+      <text
+        x="12"
+        y="16"
+        textAnchor="middle"
+        fontSize="4.6"
+        fontWeight="700"
+        fontFamily="Helvetica, Arial, sans-serif"
+        fill="#fff"
+      >
+        PDF
+      </text>
+    </svg>
+  )
+}
+
+export function GoogleSheetsIcon({ size = 20, className, style }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      style={style}
+      aria-hidden="true"
+    >
+      <path
+        fill="#0f9d58"
+        d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"
+      />
+      <path fill="#87ceac" d="M14.5 2v5.5H20L14.5 2Z" />
+      <g fill="#fff">
+        <rect x="8" y="11" width="8" height="1.4" rx="0.3" />
+        <rect x="8" y="13.3" width="8" height="1.4" rx="0.3" />
+        <rect x="8" y="15.6" width="8" height="1.4" rx="0.3" />
+      </g>
+    </svg>
+  )
+}
+
 export function FileIcon(props) {
   return (
     <Icon {...props}>

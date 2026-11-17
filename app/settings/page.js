@@ -5,10 +5,11 @@ import * as XLSX from 'xlsx'
 import Sidebar from '@/components/Sidebar'
 import { useTheme } from '@/components/ThemeProvider'
 import { fetchUser } from '@/lib/api'
-import { parseDateValue, toDateOnlyString, membershipDateToYear, getStatusLabel } from '@/lib/utils'
+import { parseDateValue, toDateOnlyString, getStatusLabel } from '@/lib/utils'
 import { passwordProblem } from '@/lib/password-policy'
 import { memberDuplicateKey } from '@/lib/member-duplicate'
-import { SaveIcon, SunIcon, MoonIcon, UploadIcon, DownloadIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
+import { memberExportMatrix, memberExportTitle } from '@/lib/member-export'
+import { SaveIcon, SunIcon, MoonIcon, UploadIcon, PdfFileIcon, GoogleSheetsIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
 
 const COLUMN_MAP = {
   'last name': 'last_name',
@@ -182,8 +183,8 @@ export default function SettingsPage() {
   const [importErrors, setImportErrors] = useState(null)
   const [applying, setApplying] = useState(false)
 
-  const [exportFormat, setExportFormat] = useState('xlsx')
-  const [exporting, setExporting] = useState(false)
+  // 'pdf' | 'sheets' | null — one export at a time, each with its own button.
+  const [exporting, setExporting] = useState(null)
   const [exportProgress, setExportProgress] = useState(null)
 
   useEffect(() => {
@@ -442,94 +443,146 @@ export default function SettingsPage() {
     setApplying(false)
   }
 
-  async function handleExport() {
-    setExporting(true)
-    setExportProgress({ message: 'Fetching members...', percent: 20 })
+  async function handleExportPdf() {
+    setExporting('pdf')
+    setError(null)
+    setExportProgress({ message: 'Fetching members\u2026', percent: 15 })
 
     try {
       const res = await fetch('/api/members')
       const members = await res.json()
       if (!res.ok) throw new Error(members.error || 'Failed to fetch members')
+      if (!members.length) throw new Error('There are no members to export yet.')
 
-      setExportProgress({ message: 'Generating file...', percent: 60 })
+      setExportProgress({ message: 'Building the PDF\u2026', percent: 55 })
 
-      const exportData = members.map(m => ({
-        'Last Name': m.last_name,
-        'First Name': m.first_name,
-        'Middle Name': m.middle_name || '',
-        'Date of Birth': m.date_of_birth,
-        'Gender': m.gender || '',
-        'Citizenship': m.citizenship || '',
-        'Relationship Status': m.relationship_status || '',
-        'Wedding Anniversary': m.wedding_anniversary || '',
-        'Communicant Class Graduate': m.communicant_class_graduate || '',
-        'Date of Membership': membershipDateToYear(m.date_of_membership),
-        'Membership Status': m.membership_status || '',
-        'Membership Type': m.membership_type || '',
-        'Phone Number': m.phone_number || '',
-        'Email Address': m.email_address || '',
-        'Street Address': m.street_address || '',
-        'Village': m.village || '',
-        'Barangay': m.barangay || '',
-        'City': m.city || '',
-      }))
+      // jsPDF and its table plugin are a few hundred kilobytes, so they are
+      // only downloaded when someone actually asks for a PDF.
+      const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ])
 
-      setExportProgress({ message: 'Generating file...', percent: 80 })
+      const title = memberExportTitle()
+      const [header, ...rows] = memberExportMatrix(members, { display: true })
+      const generated = new Date().toLocaleString('en-US', {
+        dateStyle: 'long',
+        timeStyle: 'short',
+      })
 
-      const ws = XLSX.utils.json_to_sheet(exportData)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Members')
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
 
-      const now = new Date()
-      const mm = String(now.getMonth() + 1).padStart(2, '0')
-      const dd = String(now.getDate()).padStart(2, '0')
-      const yyyy = now.getFullYear()
-      const baseFilename = `SEC Membership Masterlist (${mm}-${dd}-${yyyy})`
-      const ext = exportFormat === 'csv' ? 'csv' : 'xlsx'
-      const fullFilename = `${baseFilename}.${ext}`
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.setTextColor(38, 30, 32)
+      doc.text('SEC Membership Masterlist', 8, 13)
 
-      if ('showSaveFilePicker' in window) {
-        try {
-          const handle = await window.showSaveFilePicker({
-            suggestedName: fullFilename,
-            types: [{
-              description: exportFormat === 'csv' ? 'CSV File' : 'Excel Workbook',
-              accept: exportFormat === 'csv'
-                ? { 'text/csv': ['.csv'] }
-                : { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] }
-            }]
-          })
-          const writable = await handle.createWritable()
-          if (exportFormat === 'csv') {
-            const str = XLSX.write(wb, { bookType: 'csv', type: 'string' })
-            await writable.write(str)
-          } else {
-            const arr = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-            await writable.write(arr)
-          }
-          await writable.close()
-        } catch (err) {
-          if (err.name === 'AbortError') {
-            setExportProgress(null)
-            setExporting(false)
-            return
-          }
-          throw err
-        }
-      } else {
-        XLSX.writeFile(wb, fullFilename, { bookType: exportFormat })
-      }
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(120, 110, 112)
+      doc.text(
+        `${members.length} member${members.length === 1 ? '' : 's'}  ·  UCCP SE Church  ·  generated ${generated}`,
+        8,
+        18
+      )
+
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+
+      autoTable(doc, {
+        head: [header],
+        body: rows,
+        startY: 22,
+        margin: { top: 22, left: 6, right: 6, bottom: 13 },
+        styles: {
+          font: 'helvetica',
+          fontSize: 6.2,
+          cellPadding: 1.1,
+          overflow: 'linebreak',
+          textColor: [45, 38, 40],
+          lineColor: [225, 218, 220],
+          lineWidth: 0.1,
+          valign: 'top',
+        },
+        headStyles: {
+          fillColor: [107, 14, 30],
+          textColor: 255,
+          fontStyle: 'bold',
+          halign: 'left',
+        },
+        alternateRowStyles: { fillColor: [250, 246, 247] },
+        didDrawPage: () => {
+          doc.setFontSize(7)
+          doc.setTextColor(140, 130, 132)
+          doc.text('The Family Sync · UCCP SE Church', 6, pageHeight - 5)
+          doc.text(
+            `Page ${doc.internal.getCurrentPageInfo().pageNumber} of @@TOTAL@@`,
+            pageWidth - 6,
+            pageHeight - 5,
+            { align: 'right' }
+          )
+        },
+      })
+
+      // DidDrawPage runs while the table is still paginating, so the total is
+      // filled in afterwards (a plain literal, not a regex, as the placeholder).
+      doc.putTotalPages('@@TOTAL@@')
+
+      setExportProgress({ message: 'Saving\u2026', percent: 95 })
+      doc.save(`${title}.pdf`)
 
       setExportProgress({ message: 'Done!', percent: 100 })
       setTimeout(() => {
         setExportProgress(null)
-        setMessage(`Exported ${members.length} member${members.length !== 1 ? 's' : ''} as ${exportFormat.toUpperCase()}.`)
+        setMessage(`Exported ${members.length} member${members.length !== 1 ? 's' : ''} as a PDF.`)
       }, 500)
     } catch (err) {
       setError(err.message)
       setExportProgress(null)
     }
-    setExporting(false)
+    setExporting(null)
+  }
+
+  async function handleExportSheets() {
+    // Opened during the click (before any await) so the popup blocker lets it
+    // through; it is pointed at the new sheet once Google answers.
+    let tab = window.open('', '_blank')
+    if (tab) {
+      try {
+        tab.opener = null
+      } catch {
+        // Cross-origin assignment can be refused; the tab still navigates.
+      }
+    }
+
+    setExporting('sheets')
+    setError(null)
+    setExportProgress({ message: 'Creating the spreadsheet\u2026', percent: 40 })
+
+    try {
+      const res = await fetch('/api/export/sheets', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to export to Google Sheets')
+
+      setExportProgress({ message: 'Done!', percent: 100 })
+
+      if (tab) {
+        tab.location.replace(data.url)
+      } else {
+        window.location.href = data.url
+      }
+
+      const note = data.shared
+        ? ''
+        : ' It is owned by the church Google account, so open it there if the link asks for access.'
+      setMessage(`Created \u201c${data.title}\u201d with ${data.rows} member${data.rows !== 1 ? 's' : ''}.${note}`)
+      setTimeout(() => setExportProgress(null), 1200)
+    } catch (err) {
+      if (tab) tab.close()
+      setError(err.message)
+      setExportProgress(null)
+    }
+    setExporting(null)
   }
 
   function closePreview() {
@@ -621,29 +674,31 @@ export default function SettingsPage() {
 
                 <div className="export-section">
                   <div className="import-export-icon">
-                    <DownloadIcon size={24} />
+                    <GoogleSheetsIcon size={24} />
                   </div>
                   <h3 className="import-export-title">Export Members</h3>
                   <p className="import-export-desc">
-                    Download all members from the database in your preferred format.
+                    Download a print-ready PDF of the masterlist, or create a Google Sheet in the
+                    church account&apos;s Drive and open it.
                   </p>
                   <div className="export-controls">
-                    <select
-                      className="form-select export-format-select"
-                      value={exportFormat}
-                      onChange={e => setExportFormat(e.target.value)}
-                      disabled={exporting}
-                    >
-                      <option value="xlsx">Excel (.xlsx)</option>
-                      <option value="csv">CSV (.csv)</option>
-                    </select>
                     <button
+                      type="button"
                       className="btn btn-primary"
-                      onClick={handleExport}
-                      disabled={exporting}
+                      onClick={handleExportPdf}
+                      disabled={!!exporting}
                     >
-                      <DownloadIcon size={16} />
-                      {exporting ? 'Exporting\u2026' : 'Export'}
+                      <PdfFileIcon size={16} />
+                      {exporting === 'pdf' ? 'Exporting\u2026' : 'Export PDF'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleExportSheets}
+                      disabled={!!exporting}
+                    >
+                      <GoogleSheetsIcon size={16} />
+                      {exporting === 'sheets' ? 'Exporting\u2026' : 'Export to Google Sheets'}
                     </button>
                   </div>
                   {exportProgress && (

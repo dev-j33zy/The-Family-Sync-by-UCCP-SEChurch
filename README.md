@@ -7,7 +7,8 @@ A full-stack church family membership management web app built with **Next.js 16
 ## Features
 
 - **Dashboard** — stats cards, birthday/anniversary calendar, 7-day reminders
-- **Members** — full CRUD, search, filter, sort, paginate, communicant class tracking
+- **Members** — full CRUD, search, filter, sort, communicant class tracking
+- **Export** — masterlist as a print-ready PDF or as a Google Sheet created in the church account's Drive
 - **Profile Photos** — upload, crop to square, compress under 1MB, expand preview with replace/edit/delete
 - **Family Tree** — interactive visualization with spouse, sibling, parent, child, and grandchild relationships
 - **Admin Tools** — invite users by email, send password-reset links, delete users, test email delivery, list registered admins
@@ -29,6 +30,7 @@ A full-stack church family membership management web app built with **Next.js 16
   Models live in `lib/models/`; `lib/models/index.js` exposes `modelsFor(domain)`, and `lib/db.js` holds one cached connection per domain. Cross-cluster `populate()` is not supported, so references between clusters (e.g. a blast's `created_by`) are resolved with a second query. Date-only fields (`date_of_birth`, `wedding_anniversary`, `date_of_membership`) are stored at **UTC midnight** and written through `parseDateOnly()`, so the API returns the same calendar day whatever the server timezone (local dev in UTC+8, Vercel in UTC).
 - **Auth**: sessions signed in `lib/auth.js`, verified on every API route; no external auth provider.
 - **Email**: `lib/email.js` sends through the Gmail API with a Workspace refresh token; `lib/auth-tokens.js` issues single-use invite/reset links (hashed in the admin cluster, 48 h for invites, 1 h for resets).
+- **Export**: `lib/member-export.js` defines the masterlist columns once; the settings page renders them with jsPDF in the browser, and `app/api/export/sheets/route.js` writes the same rows into a new spreadsheet through the Sheets API.
 - **Desktop widget**: Electron app that signs in with a Family Sync account and reads birthdays/anniversaries from `/api/widget/events`; no database credentials on the client.
 - **MongoDB only**: every read and write goes through the three Atlas clusters above. There is no Postgres/Supabase runtime, SDK, or connection string in the app.
 
@@ -100,7 +102,7 @@ admin cluster is configured.
 | `MONGODB_URI` | Admin cluster: users + sessions |
 | `MONGODB_URI_MEMBERS` | Members cluster: groups, members, relationships, text blasts |
 | `MONGODB_URI_IMAGES` | Images cluster: profile photo bytes |
-| `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` / `GMAIL_REFRESH_TOKEN` | Gmail API credentials (see **Email** below) |
+| `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` / `GMAIL_REFRESH_TOKEN` | Google API credentials for email **and** the Sheets export (see **Email** below) |
 | `EMAIL_FROM` | Address mail is sent from, e.g. `The Family Sync <no-reply@domain>`; must be the authorized mailbox or a verified "Send mail as" alias |
 | `NEXT_PUBLIC_APP_URL` | Absolute app URL used in emailed links; required in production |
 | `WIDGET_API_KEY` | Legacy only: authorizes `GET /api/public/events` for widgets older than v1.4.0 (retire it once they are upgraded) |
@@ -118,7 +120,7 @@ per-email cost, roughly 2,000 messages/day per user).
 **One-time setup**
 
 1. Google Cloud Console → create a project → **APIs & Services → Library** →
-   enable **Gmail API**.
+   enable **Gmail API**, **Google Sheets API** and **Google Drive API**.
 2. **OAuth consent screen** → User type **Internal** → publishing status
    **In production**. Internal apps skip Google's verification review, and a
    production consent screen keeps the refresh token alive (tokens from a
@@ -129,15 +131,16 @@ per-email cost, roughly 2,000 messages/day per user).
 5. Put the client id/secret in `.env.local`, then run:
 
    ```bash
-   node scripts/gmail-auth.js
+   npm run google-auth
    ```
 
    It opens a consent page, prints `GMAIL_REFRESH_TOKEN`, and lists every
-   address the mailbox is allowed to send as. Copy the values into `.env.local`
-   and into the Vercel project (Production).
+   address the mailbox is allowed to send as. One consent covers the Gmail,
+   Sheets and Drive (app-created files) scopes. Copy the values into
+   `.env.local` and into the Vercel project (Production).
 
    If the browser never makes it back to `127.0.0.1:53682` (firewall, remote
-   session, browser on another machine), run `node scripts/gmail-auth.js
+   session, browser on another machine), run `npm run google-auth --
    --manual`, open the printed URL yourself, and paste the address you land on
    — it still contains the code even though the page cannot load.
 
@@ -161,6 +164,24 @@ per-email cost, roughly 2,000 messages/day per user).
 If an invitation cannot be delivered (misconfiguration, Gmail rejection) the
 Admin Tools page shows the link so it can be passed along by hand. Public
 "forgot password" never reveals whether an address has an account.
+
+## Export (PDF and Google Sheets)
+
+**Settings → Data Management** has one button per format — no dropdown:
+
+| Button | What it does |
+|---|---|
+| **Export PDF** | Renders the masterlist with jsPDF in the browser (landscape A4, repeating column headers, page numbers) and downloads `SEC Membership Masterlist (MM-DD-YYYY).pdf`. Nothing is uploaded. |
+| **Export to Google Sheets** | Creates a spreadsheet with that same name in the authorized mailbox's Drive, fills its `Members` sheet, shares it with the signed-in administrator, and opens it in a new tab. |
+
+Both buttons read the column list in `lib/member-export.js`, so the two outputs
+cannot drift apart. The sheet keeps stored values (`new`, `active`, …) so an
+export can be re-imported unchanged; the PDF shows the display labels
+("Preparatory"). The Sheets button needs the Google setup above — the Sheets and
+Drive APIs enabled and a refresh token minted after those scopes were added. If
+that is missing the request fails with a message naming the step, not a silent
+error. Every export is a new file owned by the church mailbox; the administrator
+also gets a share, so it appears in their own Drive too.
 
 ## Desktop Widget
 
@@ -205,10 +226,12 @@ lib/models/           Mongoose schemas + modelsFor(domain)
 lib/images.js         Profile photo storage in the images cluster
 lib/auth.js           Session + password helpers
 lib/auth-tokens.js    Invite / password-reset tokens (hashed, single-use)
-lib/email.js          Gmail API sender (OAuth refresh token, MIME builder)
+lib/google-auth.js    Google OAuth refresh-token exchange shared by email + export
+lib/email.js          Gmail API sender (MIME builder)
 lib/email-templates.js  Invite, reset and notification message bodies
 lib/account-mail.js   Who gets which account email
+lib/member-export.js  Masterlist columns shared by the PDF and Sheets exports
 lib/serialize.js      API response shaping (id, dates, nested relations)
-scripts/              Gmail auth, admin creation + member-code backfill helpers
+scripts/              Google auth, admin creation + member-code backfill helpers
 widget/               Electron desktop widget
 ```
