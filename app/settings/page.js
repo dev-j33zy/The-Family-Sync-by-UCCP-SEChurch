@@ -624,9 +624,9 @@ export default function SettingsPage() {
         data.access === 'public'
           ? ' Anyone with the link can view it.'
           : data.access === 'domain'
-            ? ` Anyone signed in to ${data.domain} with the link can view it.`
-            : data.shared
-              ? ''
+            ? ` Viewable by anyone signed in to ${data.domain}.`
+            : data.sharedWith
+              ? ` Shared with ${data.sharedWith}.`
               : ' It is owned by the church Google account, so open it there if the link asks for access.'
       setMessage(`Created \u201c${data.title}\u201d with ${data.rows} member${data.rows !== 1 ? 's' : ''}.${accessNote}`)
       setTimeout(() => setExportProgress(null), 1200)

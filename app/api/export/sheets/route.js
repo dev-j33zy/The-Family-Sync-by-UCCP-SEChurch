@@ -192,11 +192,23 @@ export async function POST(request) {
       }
     }
 
+    // Open the sheet as the account that was just granted access. Browsers with
+    // several Google accounts otherwise pick whichever one is active, which
+    // shows "You need access" on a file the administrator can actually edit.
+    // Only addresses that are certainly Google accounts are hintable.
+    const sheetUrl = new URL(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`)
+    const adminAddress = String(user.email || '').toLowerCase()
+    const adminHost = adminAddress.slice(adminAddress.lastIndexOf('@') + 1)
+    const googleAccount =
+      adminHost === 'gmail.com' || adminHost === 'googlemail.com' || adminHost === accessDomain
+    if (adminAddress && googleAccount) sheetUrl.searchParams.set('authuser', adminAddress)
+
     return NextResponse.json({
-      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+      url: sheetUrl.toString(),
       title,
       rows: members.length,
       shared,
+      sharedWith: shared ? user.email : null,
       access,
       domain: accessDomain,
     })
