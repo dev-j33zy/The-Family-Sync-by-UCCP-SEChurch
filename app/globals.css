@@ -761,6 +761,15 @@ img { max-width: 100%; display: block; }
   gap: 16px;
 }
 
+/* First / Last / Middle / Prefix share one row on desktop. Prefix gets less
+   space because it only holds short values such as Jr., Sr., or III. */
+.form-grid-names {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1.25fr 1.25fr 1fr 0.75fr;
+  gap: 16px;
+}
+
 .form-grid-3 {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -2240,7 +2249,7 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
   }
   .page-wrapper { padding: 16px; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
-  .form-grid, .form-grid-3, .detail-grid { grid-template-columns: 1fr; }
+  .form-grid, .form-grid-3, .form-grid-names, .detail-grid { grid-template-columns: 1fr; }
   .desktop-only { display: none !important; }
   .mobile-only { display: revert !important; }
   

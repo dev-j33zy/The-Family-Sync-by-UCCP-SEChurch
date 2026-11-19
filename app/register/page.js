@@ -689,26 +689,28 @@ export default function RegisterPage() {
           <div className="form-section">
             <div className="form-section-title">Personal Information</div>
             <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label" htmlFor="first_name">First Name <span className="required">*</span></label>
-                <input id="first_name" className="form-input" value={form.first_name}
-                  onChange={e => set('first_name', e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="last_name">Last Name <span className="required">*</span></label>
-                <input id="last_name" className="form-input" value={form.last_name}
-                  onChange={e => set('last_name', e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="middle_name">Middle Name <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(optional)</span></label>
-                <input id="middle_name" className="form-input" value={form.middle_name}
-                  onChange={e => set('middle_name', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="prefix">Prefix <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(optional)</span></label>
-                <input id="prefix" className="form-input" value={form.prefix} maxLength={12}
-                  placeholder="e.g. Jr., Sr., III" style={{ maxWidth: '120px' }}
-                  onChange={e => set('prefix', e.target.value)} />
+              <div className="form-grid-names">
+                <div className="form-group">
+                  <label className="form-label" htmlFor="first_name">First Name <span className="required">*</span></label>
+                  <input id="first_name" className="form-input" value={form.first_name}
+                    onChange={e => set('first_name', e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="last_name">Last Name <span className="required">*</span></label>
+                  <input id="last_name" className="form-input" value={form.last_name}
+                    onChange={e => set('last_name', e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="middle_name">Middle Name <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(optional)</span></label>
+                  <input id="middle_name" className="form-input" value={form.middle_name}
+                    onChange={e => set('middle_name', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="prefix">Prefix <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(optional)</span></label>
+                  <input id="prefix" className="form-input" value={form.prefix} maxLength={12}
+                    placeholder="e.g. Jr., Sr., III"
+                    onChange={e => set('prefix', e.target.value)} />
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="gender">Gender <span className="required">*</span></label>
