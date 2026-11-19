@@ -115,7 +115,22 @@ installer. Old installers in git history predate the removal of embedded
 credentials — treat those credentials as public and rotate them, and purge the
 history if the repository is shared.
 
-## 8. Operational checklist
+## 8. Dependency hygiene
+
+- Next.js is pinned to **16.4.6**. Versions 16.0–16.4 carried critical
+  unauthenticated RCE advisories (image optimization, `use cache`, middleware)
+  that would have bypassed every application-level control above. Keep this
+  pinned and review `npm audit` before each release.
+- The `xlsx` spreadsheet parser is pinned to **0.20.3** from SheetJS. The npm
+  registry copy is abandoned at 0.18.5 (prototype pollution + ReDoS), and the
+  fixed release is no longer published there. The verified tarball is vendored
+  at `vendor/xlsx-0.20.3.tgz` (SHA-256
+  `8dc73fc3b00203e72d176e85b50938627c7b086e607c682e8d3c22c02bb99fe8`) so
+  `npm ci` works on Vercel without enabling remote package fetching.
+- Production dependencies currently audit clean. The remaining advisories are
+  in dev-only lint/build tooling and do not ship to the runtime.
+
+## 9. Operational checklist
 
 - [ ] Set `NEXT_PUBLIC_APP_URL` in Vercel Production (emailed links + CSRF).
 - [ ] Rotate the three MongoDB passwords and scope each user to one database.
