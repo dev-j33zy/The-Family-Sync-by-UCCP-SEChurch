@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { oid } from '@/lib/db'
 import { modelsFor } from '@/lib/models'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { assignMemberCode } from '@/lib/member-code'
 import { applyMembershipRules, cleanMemberInput } from '@/lib/member-input'
 import { applyMemberPhoto, deleteMemberImage } from '@/lib/images'
@@ -43,10 +43,8 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 })
     }
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const member = await Member.findById(memberId)
       .populate('family_group_id', 'name')
@@ -84,10 +82,8 @@ export async function PUT(request, { params }) {
 
     const body = await request.json()
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     applyMembershipRules(body)
 
@@ -163,10 +159,8 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 })
     }
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const member = await Member.findById(memberId).lean()
     if (!member) {

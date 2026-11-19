@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { oid } from '@/lib/db'
 import { modelsFor } from '@/lib/models'
 import { RELATIONSHIP_TYPES } from '@/lib/models/relationship'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { serializeRelationship } from '@/lib/serialize'
 
 // A relationship type says what `related_member_id` is to `member_id` (e.g.
@@ -35,10 +35,8 @@ export async function GET(request) {
   try {
     const { FamilyGroup, Member, Relationship } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const { searchParams } = new URL(request.url)
     const memberIdParam = searchParams.get('member_id')
@@ -82,10 +80,8 @@ export async function POST(request) {
   try {
     const { FamilyGroup, Member, Relationship } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const body = await request.json()
     const memberId = oid(body.member_id)

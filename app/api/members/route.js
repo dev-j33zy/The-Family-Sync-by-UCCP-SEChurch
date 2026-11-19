@@ -7,6 +7,7 @@ import { applyMembershipRules, cleanMemberInput } from '@/lib/member-input'
 import { applyMemberPhoto } from '@/lib/images'
 import { serializeMember } from '@/lib/serialize'
 import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
+import { readJson } from '@/lib/validate'
 
 // The public register page only needs enough to spot an existing record, so do
 // not hand out birthday lists to anyone who guesses a common surname.
@@ -116,7 +117,10 @@ export async function POST(request) {
       if (!limit.allowed) return tooManyRequests(limit.retryAfter)
     }
 
-    const body = await request.json()
+    // Public registration: cap the payload and reject Mongo operator keys
+    // before any value reaches a model.
+    const { value: body, error: bodyError } = await readJson(request, 128 * 1024)
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 })
     applyMembershipRules(body, { creating: true })
 
     const { values, photo, error } = cleanMemberInput(body)

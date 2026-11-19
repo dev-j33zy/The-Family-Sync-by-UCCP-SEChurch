@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server'
 import { oid } from '@/lib/db'
 import { modelsFor } from '@/lib/models'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { serializeRelationship } from '@/lib/serialize'
 
 export async function GET(request, { params }) {
   try {
     const { FamilyGroup, Member, Relationship } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const { id } = await params
     const relId = oid(id)
@@ -40,10 +38,8 @@ export async function DELETE(request, { params }) {
   try {
     const { Member, Relationship } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const { id } = await params
     const relId = oid(id)

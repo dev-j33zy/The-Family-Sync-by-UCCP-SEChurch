@@ -2,11 +2,18 @@ import { NextResponse } from 'next/server'
 import { dateOnly } from '@/lib/db'
 import { modelsFor } from '@/lib/models'
 import { assignMemberCode } from '@/lib/member-code'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { applyMembershipRules, cleanMemberInput } from '@/lib/member-input'
 import { memberDuplicateKey } from '@/lib/member-duplicate'
 import { applyMemberPhoto } from '@/lib/images'
 import { serializeMember } from '@/lib/serialize'
+import { readJson } from '@/lib/validate'
+import { securityLog, securityContext } from '@/lib/audit'
+import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
+
+// A spreadsheet import is a bulk write plus one photo write per row. Cap it so
+// a malformed upload cannot monopolise the connection pool or the event loop.
+const MAX_IMPORT_ROWS = 500
 
 function conflictSummary(conflicts) {
   const count = conflicts.length
@@ -17,15 +24,28 @@ export async function POST(request) {
   try {
     const { Member } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
-    const { members } = await request.json()
+    const limit = rateLimit(`import:${clientIp(request)}`, {
+      limit: 10,
+      windowMs: 60 * 60 * 1000,
+    })
+    if (!limit.allowed) return tooManyRequests(limit.retryAfter)
+
+    const { value: body, error: bodyError } = await readJson(request, 4 * 1024 * 1024)
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 })
+    const members = body.members
 
     if (!Array.isArray(members) || members.length === 0) {
       return NextResponse.json({ error: 'No members to import' }, { status: 400 })
+    }
+    if (members.length > MAX_IMPORT_ROWS) {
+      securityLog('import.rejected', securityContext(request, { reason: 'too-many-rows', count: members.length }))
+      return NextResponse.json(
+        { error: `An import may contain at most ${MAX_IMPORT_ROWS} rows. Split the file and try again.` },
+        { status: 400 }
+      )
     }
 
     // Validate every row before touching the database: a half-finished import
@@ -100,6 +120,12 @@ export async function POST(request) {
 
     const ids = inserted.map(member => member._id)
     const updated = await Member.find({ _id: { $in: ids } }).lean()
+
+    securityLog('admin.action', securityContext(request, {
+      action: 'members.import',
+      userId: user.id,
+      rows: inserted.length,
+    }))
 
     return NextResponse.json({
       data: updated.map(serializeMember),

@@ -2,7 +2,32 @@ const { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage, saf
 const path = require('path')
 const fs = require('fs')
 const https = require('https')
+const crypto = require('crypto')
+const { pathToFileURL } = require('url')
 const { spawn } = require('child_process')
+
+// An update is only ever fetched from this project's GitHub release and the
+// CDN GitHub redirects to. The renderer cannot pass an arbitrary URL: it only
+// supplies a version/name for display, and the main process re-checks the
+// offer before downloading anything.
+const UPDATE_RELEASE_URL =
+  'https://api.github.com/repos/dev-j33zy/The-Family-Sync-by-UCCP-SEChurch/releases/latest'
+const DOWNLOAD_HOSTS = new Set([
+  'github.com',
+  'objects.githubusercontent.com',
+  'github-releases.githubusercontent.com',
+  'objects-origin.githubusercontent.com',
+])
+const MAX_UPDATE_BYTES = 200 * 1024 * 1024
+
+function allowedDownloadUrl(value) {
+  try {
+    const url = new URL(String(value))
+    return url.protocol === 'https:' && DOWNLOAD_HOSTS.has(url.hostname.toLowerCase())
+  } catch {
+    return false
+  }
+}
 
 // Look for .env next to the portable exe first (electron-builder sets
 // PORTABLE_EXECUTABLE_DIR), then next to an installed exe, then in the app
@@ -148,6 +173,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Reverse-engineering resistance: packaged builds have no DevTools and
+      // no remote debugging port. Source builds keep them for development.
+      devTools: !app.isPackaged,
     },
   }
 
@@ -157,6 +185,21 @@ function createWindow() {
   }
 
   mainWindow = new BrowserWindow(winSettings)
+
+  // The renderer only ever loads the widget's own local page. Blocking other
+  // navigation stops a malicious link from swapping in a look-alike UI that
+  // could read the session token through the preload bridge.
+  const ownPage = pathToFileURL(path.join(__dirname, 'src', 'index.html')).href
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url !== ownPage && !url.startsWith(ownPage + '#')) event.preventDefault()
+  })
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  if (app.isPackaged) {
+    mainWindow.webContents.on('devtools-opened', () => {
+      mainWindow.webContents.closeDevTools()
+    })
+  }
+
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'))
 
   // Ask the renderer to reload data whenever the widget is reopened or focused,
@@ -277,32 +320,45 @@ function appUrl() {
   return raw.replace(/\/+$/, '')
 }
 
+function storageAvailable() {
+  try {
+    return safeStorage.isEncryptionAvailable()
+  } catch {
+    return false
+  }
+}
+
+// Fail closed: a session token is too sensitive to leave on disk in the
+// clear. If this machine has no OS-backed encryption, sign-in is refused with
+// an explanation instead of silently writing a plaintext credential. Records
+// written by older builds (encrypted:false) are ignored and cleaned up.
 function readAuth() {
   try {
     const stored = JSON.parse(fs.readFileSync(AUTH_PATH, 'utf8'))
-    if (!stored || !stored.token) return null
-    const token = stored.encrypted
-      ? safeStorage.decryptString(Buffer.from(stored.token, 'base64'))
-      : stored.token
-    return { token, email: stored.email || null }
+    if (!stored || !stored.token || stored.encrypted !== true || !storageAvailable()) return null
+    const token = safeStorage.decryptString(Buffer.from(stored.token, 'base64'))
+    return token ? { token, email: stored.email || null } : null
   } catch {
     return null
   }
 }
 
 function writeAuth(auth) {
-  try {
-    if (!auth) {
+  if (!auth) {
+    try {
       fs.rmSync(AUTH_PATH, { force: true })
-      return
-    }
-    const record = { email: auth.email || null, token: auth.token, encrypted: false }
-    if (safeStorage.isEncryptionAvailable()) {
-      record.token = safeStorage.encryptString(auth.token).toString('base64')
-      record.encrypted = true
-    }
-    fs.writeFileSync(AUTH_PATH, JSON.stringify(record, null, 2))
-  } catch {}
+    } catch {}
+    return
+  }
+  if (!storageAvailable()) {
+    throw new Error('This computer cannot store your sign-in securely. Enable the OS credential store and try again.')
+  }
+  const record = {
+    email: auth.email || null,
+    token: safeStorage.encryptString(auth.token).toString('base64'),
+    encrypted: true,
+  }
+  fs.writeFileSync(AUTH_PATH, JSON.stringify(record, null, 2), { mode: 0o600 })
 }
 
 function sessionTokenFrom(response) {
@@ -347,7 +403,11 @@ ipcMain.handle('login', async (_, credentials) => {
   if (!token) throw new Error('Sign in succeeded but no session was returned')
 
   const accountEmail = (data.user && data.user.email) || email
-  writeAuth({ token, email: accountEmail })
+  try {
+    writeAuth({ token, email: accountEmail })
+  } catch (err) {
+    throw new Error(err.message || 'The session could not be stored securely')
+  }
   return { email: accountEmail }
 })
 
@@ -410,9 +470,14 @@ function pickSetupAsset(assets) {
   return exes.find(a => isSetupAsset(a.name)) || null
 }
 
+// Held in the main process only. The renderer sees a copy for display, but
+// the installer handler always re-reads this record instead of trusting the
+// URL passed back through IPC.
+let updateOffer = null
+
 ipcMain.handle('check-for-update', () => {
   return new Promise((resolve) => {
-    const req = https.get('https://api.github.com/repos/dev-j33zy/The-Family-Sync-by-UCCP-SEChurch/releases/latest', {
+    const req = https.get(UPDATE_RELEASE_URL, {
       headers: { 'User-Agent': 'family-sync-widget', Accept: 'application/vnd.github.v3+json' },
     }, (res) => {
       let data = ''
@@ -430,11 +495,21 @@ ipcMain.handle('check-for-update', () => {
             }
             if (compareSemver(latestVer, currentVer) > 0) {
               const asset = pickSetupAsset(release.assets)
-              if (!asset) {
-                // No installer in this release: stay quiet instead of offering
-                // an update that cannot be applied.
+              // GitHub publishes a SHA-256 digest for every release asset. No
+              // digest or an unexpected host means no update: an unverifiable
+              // installer must never be offered.
+              const digest = String(asset?.digest || '')
+              const sha256Match = /^sha256:([a-f0-9]{64})$/i.exec(digest)
+              if (!asset || !allowedDownloadUrl(asset.browser_download_url) || !sha256Match) {
                 resolve({ available: false })
                 return
+              }
+              updateOffer = {
+                version: latestVer,
+                url: asset.browser_download_url,
+                name: asset.name,
+                sha256: sha256Match[1].toLowerCase(),
+                checkedAt: Date.now(),
               }
               resolve({
                 available: true,
@@ -464,21 +539,44 @@ ipcMain.handle('check-for-update', () => {
 function downloadToFile(url, dest, redirects = 0) {
   return new Promise((resolve, reject) => {
     if (redirects > 5) return reject(new Error('Too many redirects'))
+    // Re-check every hop: a redirect to another host must not be followed,
+    // even if the original URL came from the GitHub API.
+    if (!allowedDownloadUrl(url)) return reject(new Error('Download host is not allowed'))
     https
       .get(url, { headers: { 'User-Agent': 'family-sync-widget' } }, (res) => {
         const status = res.statusCode || 0
         if (status >= 300 && status < 400 && res.headers.location) {
           res.resume()
-          const next = new URL(res.headers.location, url).toString()
+          let next
+          try {
+            next = new URL(res.headers.location, url).toString()
+          } catch {
+            return reject(new Error('Invalid redirect'))
+          }
           return downloadToFile(next, dest, redirects + 1).then(resolve, reject)
         }
         if (status !== 200) {
           res.resume()
           return reject(new Error('Download failed (' + status + ')'))
         }
+        if (Number(res.headers['content-length'] || 0) > MAX_UPDATE_BYTES) {
+          res.resume()
+          return reject(new Error('The update is too large'))
+        }
+
         const file = fs.createWriteStream(dest)
-        file.on('error', reject)
-        res.on('error', reject)
+        let received = 0
+        const fail = (err) => {
+          res.destroy()
+          file.destroy()
+          reject(err)
+        }
+        file.on('error', fail)
+        res.on('error', fail)
+        res.on('data', chunk => {
+          received += chunk.length
+          if (received > MAX_UPDATE_BYTES) fail(new Error('The update is too large'))
+        })
         res.pipe(file)
         file.on('finish', () => file.close(() => resolve(dest)))
       })
@@ -531,21 +629,40 @@ function quitAfterHandoff() {
 // the copy the installer drops in the folder is always this file.
 const APP_EXE_NAME = 'Family Sync Widget.exe'
 
-ipcMain.handle('download-and-install-update', async (_, downloadUrl, assetName) => {
-  if (!downloadUrl) throw new Error('No download URL was provided')
+ipcMain.handle('download-and-install-update', async () => {
+  // Deliberately ignore the URL/name the renderer passes back. Only a fresh,
+  // main-process check can authorise an installer, and the SHA-256 digest
+  // comes from GitHub's signed API response rather than the page.
+  const offer = updateOffer
+  if (
+    !app.isPackaged ||
+    !offer ||
+    Date.now() - offer.checkedAt > 60 * 60 * 1000 ||
+    !allowedDownloadUrl(offer.url)
+  ) {
+    throw new Error('No verified update is available. Please check for updates again.')
+  }
 
   const tempDir = app.getPath('temp')
-  const assetFile = String(assetName || path.basename(new URL(downloadUrl).pathname) || '')
+  const assetFile = String(offer.name || path.basename(new URL(offer.url).pathname) || '')
   const safeName = assetFile.replace(/[^A-Za-z0-9._ -]/g, '') || 'family-sync-widget-setup.exe'
   if (!isSetupAsset(safeName)) {
     throw new Error('This update is not an installer and cannot be applied')
   }
   const tempExe = path.join(tempDir, safeName)
 
-  await downloadToFile(downloadUrl, tempExe)
+  await downloadToFile(offer.url, tempExe)
+
+  const actual = crypto.createHash('sha256').update(fs.readFileSync(tempExe)).digest('hex')
+  if (actual !== offer.sha256) {
+    fs.unlink(tempExe, () => {})
+    updateOffer = null
+    throw new Error('The downloaded update did not match its published checksum')
+  }
 
   if (!isWindowsExecutable(tempExe)) {
     fs.unlink(tempExe, () => {})
+    updateOffer = null
     throw new Error('The downloaded update is not a valid Windows executable')
   }
 
@@ -574,12 +691,33 @@ ipcMain.handle('download-and-install-update', async (_, downloadUrl, assetName) 
     'exit /b 0',
   ])
 
+  updateOffer = null
   quitAfterHandoff()
   return { success: true, mode: 'installer' }
 })
 
+// Only known HTTPS destinations may be opened from the widget. Without this,
+// a crafted link in the renderer could launch a local file or a privileged
+// protocol handler through shell.openExternal.
+function allowedExternalUrl(value) {
+  try {
+    const url = new URL(String(value))
+    if (url.protocol !== 'https:') return false
+    const hosts = new Set([
+      new URL(appUrl()).hostname.toLowerCase(),
+      'github.com',
+      'docs.google.com',
+      'drive.google.com',
+    ])
+    return hosts.has(url.hostname.toLowerCase())
+  } catch {
+    return false
+  }
+}
+
 ipcMain.handle('open-external', (_, url) => {
-  shell.openExternal(url)
+  if (!allowedExternalUrl(url)) throw new Error('This link is not allowed')
+  return shell.openExternal(url)
 })
 
 app.isQuitting = false

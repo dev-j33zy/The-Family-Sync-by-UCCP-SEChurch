@@ -16,6 +16,7 @@ import {
   notifyPasswordChanged,
 } from '@/lib/account-mail'
 import { serializeUser } from '@/lib/serialize'
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -48,11 +49,22 @@ export async function PATCH(request) {
     const update = {}
     const changes = { email: null, previousName: null, nameChanged: false, password: false }
 
-    // Verify the current password at most once per request.
+    // Verify the current password at most once per request, and throttle
+    // guesses: a stolen session must not become an offline password oracle.
     let currentPasswordOk = null
+    let passwordThrottled = false
     async function checkCurrentPassword() {
       if (currentPasswordOk !== null) return currentPasswordOk
       if (!body.current_password) {
+        currentPasswordOk = false
+        return false
+      }
+      const limit = rateLimit(`account-password:${user.id}`, {
+        limit: 10,
+        windowMs: 15 * 60 * 1000,
+      })
+      if (!limit.allowed) {
+        passwordThrottled = true
         currentPasswordOk = false
         return false
       }
@@ -69,6 +81,7 @@ export async function PATCH(request) {
 
       if (email !== current.email) {
         if (!(await checkCurrentPassword())) {
+          if (passwordThrottled) return tooManyRequests(15 * 60)
           return NextResponse.json(
             { error: 'Current password is required to change the sign-in email' },
             { status: 400 }
@@ -95,6 +108,7 @@ export async function PATCH(request) {
         )
       }
       if (!(await checkCurrentPassword())) {
+        if (passwordThrottled) return tooManyRequests(15 * 60)
         return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 })
       }
 

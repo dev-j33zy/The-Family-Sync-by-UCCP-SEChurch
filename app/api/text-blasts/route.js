@@ -1,15 +1,36 @@
 import { NextResponse } from 'next/server'
 import { escapeRegex, oid, toPlain } from '@/lib/db'
 import { modelsFor } from '@/lib/models'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { SMS_ENABLED } from '@/lib/features'
 import { sendSms } from '@/lib/sms'
 import { normalizePhone, renderTemplate, isOverLimit } from '@/lib/sms-format'
+import { idList, readJson, safeObject } from '@/lib/validate'
+import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
+import { securityLog, securityContext } from '@/lib/audit'
 
 // A blast is sent inside a single request, so cap the audience. This also
 // stops a mis-click from texting the entire membership.
 const MAX_RECIPIENTS = 2000
 const SEND_CONCURRENCY = 10
+
+// Only these flat, known values may steer the recipient query. Accepting an
+// arbitrary object would let a caller put Mongo operators in a field.
+const FILTER_KEYS = ['family_group_id', 'status', 'type', 'gender', 'address_area', 'search']
+const STATUSES = ['new', 'active', 'dormant', 'cancelled']
+const TYPES = ['regular', 'associate', 'affiliate']
+const GENDERS = ['male', 'female', 'other']
+
+function sanitizeFilters(raw) {
+  const filters = safeObject(raw, FILTER_KEYS, 100)
+  if (filters.family_group_id && !/^[A-Za-z0-9]{24}$/.test(filters.family_group_id)) {
+    delete filters.family_group_id
+  }
+  if (filters.status && !STATUSES.includes(filters.status)) delete filters.status
+  if (filters.type && !TYPES.includes(filters.type)) delete filters.type
+  if (filters.gender && !GENDERS.includes(filters.gender)) delete filters.gender
+  return filters
+}
 
 function nameFilter(term) {
   const pattern = new RegExp(`(^|\\s)${escapeRegex(term)}`, 'i')
@@ -108,10 +129,8 @@ export async function GET(request) {
   try {
     const { MessageBlast } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const { searchParams } = new URL(request.url)
     const limit = Math.min(Number(searchParams.get('limit')) || 50, 200)
@@ -145,12 +164,19 @@ export async function POST(request) {
   try {
     const { Member, MessageBlast, MessageBlastRecipient } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
-    const body = await request.json()
+    // Sending costs money and reaches real people: throttle on both the
+    // address and the account even though the route is authenticated.
+    const limit = rateLimit(`sms:${clientIp(request)}`, {
+      limit: 10,
+      windowMs: 60 * 60 * 1000,
+    })
+    if (!limit.allowed) return tooManyRequests(limit.retryAfter)
+
+    const { value: body, error: bodyError } = await readJson(request, 256 * 1024)
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 })
     const message = typeof body.message === 'string' ? body.message.trim() : ''
 
     if (!message) {
@@ -160,8 +186,8 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Message is too long' }, { status: 400 })
     }
 
-    const filters = body.filters && typeof body.filters === 'object' ? body.filters : {}
-    const memberIds = Array.isArray(body.memberIds) ? body.memberIds : []
+    const filters = sanitizeFilters(body.filters)
+    const memberIds = idList(body.memberIds, MAX_RECIPIENTS)
 
     const members = await resolveRecipients(Member, filters, memberIds)
 
@@ -259,6 +285,14 @@ export async function POST(request) {
     const sent = results.filter(result => result.status === 'sent').length
     const failed = results.filter(result => result.status === 'failed').length
     const skipped = results.filter(result => result.status === 'skipped').length
+
+    securityLog('admin.action', securityContext(request, {
+      action: 'sms.blast',
+      userId: user.id,
+      recipients: prepared.length,
+      sent,
+      failed,
+    }))
 
     // Clean send, a total failure, or anything in between.
     let status = 'partial'

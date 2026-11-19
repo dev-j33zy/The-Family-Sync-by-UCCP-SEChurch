@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server'
 import { oid } from '@/lib/db'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { getMemberImage } from '@/lib/images'
 
 // Serves profile photos from the images cluster. The member API only returns a
 // short /api/images/<id> URL; the bytes never enter member documents.
 export async function GET(request, { params }) {
   try {
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const { id } = await params
     if (!oid(id)) {

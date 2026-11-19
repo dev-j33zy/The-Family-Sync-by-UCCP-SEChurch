@@ -1,21 +1,28 @@
 import { NextResponse } from 'next/server'
 import { modelsFor } from '@/lib/models'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { sendTestEmail } from '@/lib/account-mail'
 import { emailConfigured } from '@/lib/email'
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+import { cleanEmail, readJson } from '@/lib/validate'
+import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
 
 // Lets an administrator confirm the Gmail API setup without creating a throwaway
 // account or waiting for a real invite to bounce.
 export async function POST(request) {
   try {
-    const user = await authUser(request)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
-    const { email } = await request.json().catch(() => ({}))
-    const to = String(email || '').trim().toLowerCase()
-    if (!EMAIL_RE.test(to)) {
+    const limit = rateLimit(`admin:test-email:${clientIp(request)}`, {
+      limit: 10,
+      windowMs: 60 * 60 * 1000,
+    })
+    if (!limit.allowed) return tooManyRequests(limit.retryAfter)
+
+    const { value: body, error: bodyError } = await readJson(request)
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 })
+    const to = cleanEmail(body.email)
+    if (!to) {
       return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 })
     }
 

@@ -2,27 +2,38 @@ import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { appUrl } from '@/lib/app-url'
 import { modelsFor } from '@/lib/models'
-import { authUser, hashPassword } from '@/lib/auth'
+import { hashPassword } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { issueAuthToken } from '@/lib/auth-tokens'
 import { sendInviteEmail } from '@/lib/account-mail'
 import { emailConfigured } from '@/lib/email'
 import { serializeUser } from '@/lib/serialize'
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+import { cleanEmail, cleanText, readJson } from '@/lib/validate'
+import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
+import { securityLog, securityContext } from '@/lib/audit'
 
 export async function POST(request) {
   try {
-    const user = await authUser(request)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
-    const { first_name, last_name, email } = await request.json()
-    const normalizedEmail = String(email || '').trim().toLowerCase()
+    // Account creation sends an invite and mints a token: keep it a deliberate,
+    // bounded action even for a signed-in administrator.
+    const limit = rateLimit(`admin:create-user:${clientIp(request)}`, {
+      limit: 20,
+      windowMs: 60 * 60 * 1000,
+    })
+    if (!limit.allowed) return tooManyRequests(limit.retryAfter)
+
+    const { value: body, error: bodyError } = await readJson(request)
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 })
+
+    const first_name = cleanText(body.first_name, 100)
+    const last_name = cleanText(body.last_name, 100)
+    const normalizedEmail = cleanEmail(body.email)
 
     if (!first_name || !last_name || !normalizedEmail) {
       return NextResponse.json({ error: 'First name, last name, and email are required' }, { status: 400 })
-    }
-    if (!EMAIL_RE.test(normalizedEmail)) {
-      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 })
     }
 
     const { User } = await modelsFor('admin')
@@ -61,6 +72,11 @@ export async function POST(request) {
       createdBy: user.id,
     })
     const inviteUrl = `${appUrl(request)}/reset-password/${token}`
+    securityLog('token.issued', securityContext(request, {
+      purpose: 'invite',
+      actorId: user.id,
+      subjectId: String(created._id),
+    }))
 
     let emailSent = false
     let emailError = null
@@ -76,6 +92,12 @@ export async function POST(request) {
     } else {
       emailError = 'Email is not configured on this deployment.'
     }
+
+    securityLog('admin.action', securityContext(request, {
+      action: 'user.create',
+      actorId: user.id,
+      subjectId: String(created._id),
+    }))
 
     return NextResponse.json(
       {

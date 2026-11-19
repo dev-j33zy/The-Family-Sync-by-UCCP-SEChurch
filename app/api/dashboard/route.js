@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server'
 import { dateOnly } from '@/lib/db'
 import { modelsFor } from '@/lib/models'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 
 export async function GET(request) {
   try {
     const { FamilyGroup, Member, Relationship } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const members = await Member.find(
       {},

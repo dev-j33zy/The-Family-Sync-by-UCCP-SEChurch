@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { modelsFor } from '@/lib/models'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 
 export async function GET(request) {
   try {
-    const user = await authUser(request)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const { User } = await modelsFor('admin')
 

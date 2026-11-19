@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { modelsFor } from '@/lib/models'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { serializeMember } from '@/lib/serialize'
 import { memberExportMatrix, memberExportTitle } from '@/lib/member-export'
 import { googleAccessToken, googleRequest } from '@/lib/google-auth'
+import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
+import { securityLog, securityContext } from '@/lib/audit'
 
 // =============================================
 // GOOGLE SHEETS EXPORT
@@ -84,8 +86,15 @@ function setupResponse(err) {
 
 export async function POST(request) {
   try {
-    const user = await authUser(request)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
+
+    // Each export creates a real Drive file and reads the whole masterlist.
+    const limit = rateLimit(`sheets-export:${clientIp(request)}`, {
+      limit: 20,
+      windowMs: 60 * 60 * 1000,
+    })
+    if (!limit.allowed) return tooManyRequests(limit.retryAfter)
 
     const { Member } = await modelsFor('members')
 
@@ -202,6 +211,13 @@ export async function POST(request) {
     const googleAccount =
       adminHost === 'gmail.com' || adminHost === 'googlemail.com' || adminHost === accessDomain
     if (adminAddress && googleAccount) sheetUrl.searchParams.set('authuser', adminAddress)
+
+    securityLog('admin.action', securityContext(request, {
+      action: 'members.export.sheets',
+      userId: user.id,
+      rows: members.length,
+      access,
+    }))
 
     return NextResponse.json({
       url: sheetUrl.toString(),

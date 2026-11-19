@@ -1,27 +1,32 @@
 import { NextResponse } from 'next/server'
 import { appUrl } from '@/lib/app-url'
 import { modelsFor } from '@/lib/models'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { issueAuthToken } from '@/lib/auth-tokens'
 import { sendResetEmail } from '@/lib/account-mail'
 import { emailConfigured } from '@/lib/email'
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+import { cleanEmail, readJson } from '@/lib/validate'
+import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
+import { securityLog, securityContext } from '@/lib/audit'
 
 // Admin-triggered password reset: emails a single-use link instead of handing
 // out a temporary password. Sessions stay alive until the link is actually
 // used, so a mistaken click does not sign the person out.
 export async function POST(request) {
   try {
-    const user = await authUser(request)
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
-    const { email } = await request.json()
-    const normalizedEmail = String(email || '').trim().toLowerCase()
+    const limit = rateLimit(`admin:reset:${clientIp(request)}`, {
+      limit: 20,
+      windowMs: 60 * 60 * 1000,
+    })
+    if (!limit.allowed) return tooManyRequests(limit.retryAfter)
+
+    const { value: body, error: bodyError } = await readJson(request)
+    if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 })
+    const normalizedEmail = cleanEmail(body.email)
     if (!normalizedEmail) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
-    }
-    if (!EMAIL_RE.test(normalizedEmail)) {
       return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 })
     }
 
@@ -38,6 +43,11 @@ export async function POST(request) {
       createdBy: user.id,
     })
     const resetUrl = `${appUrl(request)}/reset-password/${token}`
+    securityLog('token.issued', securityContext(request, {
+      purpose: 'reset',
+      actorId: user.id,
+      subjectId: String(target._id),
+    }))
 
     if (!emailConfigured()) {
       return NextResponse.json(

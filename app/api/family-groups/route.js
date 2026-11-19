@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server'
 import { escapeRegex, oid, toPlain } from '@/lib/db'
 import { modelsFor } from '@/lib/models'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { serializeMember } from '@/lib/serialize'
 
 export async function GET(request) {
   try {
     const { FamilyGroup, Member } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
@@ -56,10 +54,8 @@ export async function POST(request) {
   try {
     const { FamilyGroup, Member } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const body = await request.json()
     if (!body.name) {
@@ -82,10 +78,8 @@ export async function DELETE(request) {
   try {
     const { FamilyGroup, Member } = await modelsFor('members')
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const { searchParams } = new URL(request.url)
     const groupId = oid(searchParams.get('id'))

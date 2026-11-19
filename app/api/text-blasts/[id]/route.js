@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { oid, toPlain } from '@/lib/db'
 import { modelsFor } from '@/lib/models'
-import { authUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/api-auth'
 import { SMS_ENABLED } from '@/lib/features'
 
 export async function GET(request, { params }) {
@@ -18,10 +18,8 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Blast not found' }, { status: 404 })
     }
 
-    const user = await authUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, response } = await requireAdmin(request)
+    if (response) return response
 
     const blast = await MessageBlast.findById(blastId).lean()
     if (!blast) {
