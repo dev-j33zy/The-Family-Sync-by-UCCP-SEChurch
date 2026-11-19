@@ -12,7 +12,7 @@ export async function GET(request) {
 
     const members = await Member.find(
       {},
-      `first_name last_name middle_name date_of_birth wedding_anniversary
+      `first_name last_name middle_name prefix date_of_birth wedding_anniversary
        relationship_status membership_type membership_status registered_at`
     )
       .collation({ locale: 'en', strength: 2 })
@@ -40,6 +40,7 @@ export async function GET(request) {
       first_name: member.first_name,
       last_name: member.last_name,
       middle_name: member.middle_name ?? null,
+      prefix: member.prefix ?? null,
       date_of_birth: dateOnly(member.date_of_birth),
       wedding_anniversary: dateOnly(member.wedding_anniversary),
       relationship_status: member.relationship_status ?? null,

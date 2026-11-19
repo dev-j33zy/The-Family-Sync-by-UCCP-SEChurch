@@ -12,6 +12,7 @@ const EMPTY_FORM = {
   first_name: '',
   last_name: '',
   middle_name: '',
+  prefix: '',
   date_of_birth: '',
   gender: '',
   citizenship: '',
@@ -36,6 +37,7 @@ function toFormMember(m) {
     first_name: m.first_name || '',
     last_name: m.last_name || '',
     middle_name: m.middle_name || '',
+    prefix: m.prefix || '',
     date_of_birth: m.date_of_birth ? String(m.date_of_birth).slice(0, 10) : '',
     gender: m.gender || '',
     citizenship: m.citizenship || '',
@@ -182,6 +184,12 @@ export default function EditMemberPage({ params }) {
                         <label className="form-label" htmlFor="middle_name">Middle Name <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(optional)</span></label>
                         <input id="middle_name" className="form-input" value={form.middle_name}
                           onChange={e => set('middle_name', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="prefix">Prefix <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(optional)</span></label>
+                        <input id="prefix" className="form-input" value={form.prefix} maxLength={12}
+                          placeholder="e.g. Jr., Sr., III" style={{ maxWidth: '120px' }}
+                          onChange={e => set('prefix', e.target.value)} />
                       </div>
                       <div className="form-group">
                         <label className="form-label" htmlFor="gender">Gender <span className="required">*</span></label>

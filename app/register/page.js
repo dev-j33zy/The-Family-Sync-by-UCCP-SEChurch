@@ -23,6 +23,7 @@ const EMPTY_FORM = {
   first_name: '',
   last_name: '',
   middle_name: '',
+  prefix: '',
   date_of_birth: '',
   gender: '',
   citizenship: '',
@@ -43,6 +44,7 @@ const COMPARE_FIELDS = [
   { key: 'first_name', label: 'First Name' },
   { key: 'last_name', label: 'Last Name' },
   { key: 'middle_name', label: 'Middle Name' },
+  { key: 'prefix', label: 'Prefix' },
   { key: 'date_of_birth', label: 'Date of Birth' },
   { key: 'gender', label: 'Gender' },
   { key: 'citizenship', label: 'Citizenship' },
@@ -702,6 +704,12 @@ export default function RegisterPage() {
                 <label className="form-label" htmlFor="middle_name">Middle Name <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(optional)</span></label>
                 <input id="middle_name" className="form-input" value={form.middle_name}
                   onChange={e => set('middle_name', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="prefix">Prefix <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(optional)</span></label>
+                <input id="prefix" className="form-input" value={form.prefix} maxLength={12}
+                  placeholder="e.g. Jr., Sr., III" style={{ maxWidth: '120px' }}
+                  onChange={e => set('prefix', e.target.value)} />
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="gender">Gender <span className="required">*</span></label>

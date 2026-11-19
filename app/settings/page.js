@@ -23,6 +23,10 @@ const COLUMN_MAP = {
   'middle name': 'middle_name',
   'middlename': 'middle_name',
   'middle initial': 'middle_name',
+  'prefix': 'prefix',
+  'name prefix': 'prefix',
+  'suffix': 'prefix',
+  'name suffix': 'prefix',
   'date of birth': 'date_of_birth',
   'dob': 'date_of_birth',
   'birth date': 'date_of_birth',
@@ -988,6 +992,7 @@ export default function SettingsPage() {
                       <th>Last Name</th>
                       <th>First Name</th>
                       <th>Middle Name</th>
+                      <th>Prefix</th>
                       <th>Date of Birth</th>
                       <th>Gender</th>
                       <th>Citizenship</th>
@@ -1005,6 +1010,7 @@ export default function SettingsPage() {
                         <td className={!m.last_name ? 'import-cell-missing' : ''}>{m.last_name || '\u2014'}</td>
                         <td className={!m.first_name ? 'import-cell-missing' : ''}>{m.first_name || '\u2014'}</td>
                         <td>{m.middle_name || '\u2014'}</td>
+                        <td>{m.prefix || '\u2014'}</td>
                         <td className={!m.date_of_birth ? 'import-cell-missing' : ''}>{m.date_of_birth || '\u2014'}</td>
                         <td>{m.gender || '\u2014'}</td>
                         <td>{m.citizenship || '\u2014'}</td>

@@ -391,7 +391,7 @@ function FamilyTreeView() {
                 <option value="">— Select a member —</option>
                 {allMembers.map(m => (
                   <option key={m.id} value={m.id}>
-                    {m.last_name}, {m.first_name} {m.middle_name || ''}
+                    {m.last_name}, {m.first_name} {m.middle_name || ''} {m.prefix || ''}
                     {m.family_groups?.name ? ` · ${m.family_groups.name}` : ''}
                   </option>
                 ))}
@@ -530,7 +530,7 @@ function FamilyTreeView() {
                     <>
                       {suggestedMembers.map(m => (
                         <option key={m.id} value={m.id}>
-                          {m.last_name}, {m.first_name} {m.middle_name || ''}
+                          {m.last_name}, {m.first_name} {m.middle_name || ''} {m.prefix || ''}
                           {m.family_groups?.name ? ` (${m.family_groups.name})` : ''}
                         </option>
                       ))}
@@ -539,7 +539,7 @@ function FamilyTreeView() {
                   )}
                   {availableForRel.filter(m => !suggestedMembers.some(s => s.id === m.id)).map(m => (
                     <option key={m.id} value={m.id}>
-                      {m.last_name}, {m.first_name} {m.middle_name || ''}
+                      {m.last_name}, {m.first_name} {m.middle_name || ''} {m.prefix || ''}
                       {m.family_groups?.name ? ` (${m.family_groups.name})` : ''}
                     </option>
                   ))}

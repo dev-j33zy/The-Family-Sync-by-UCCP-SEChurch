@@ -49,6 +49,7 @@ export default function MemberTable({ members, onDelete }) {
         m.first_name?.toLowerCase().includes(q) ||
         m.last_name?.toLowerCase().includes(q) ||
         m.middle_name?.toLowerCase().includes(q) ||
+        m.prefix?.toLowerCase().includes(q) ||
         m.member_code?.toLowerCase().includes(q) ||
         String(calculateAge(m.date_of_birth) ?? '').includes(q) ||
         m.citizenship?.toLowerCase().includes(q) ||
@@ -173,7 +174,7 @@ export default function MemberTable({ members, onDelete }) {
                       )}
                       <div>
                         <div className="member-name">
-                          {member.last_name}, {member.first_name} {member.middle_name ? member.middle_name[0] + '.' : ''}
+                          {member.last_name}, {member.first_name} {member.middle_name ? member.middle_name[0] + '.' : ''} {member.prefix || ''}
                         </div>
                         {member.family_groups?.name && (
                           <div className="member-name-family">{member.family_groups.name}</div>
