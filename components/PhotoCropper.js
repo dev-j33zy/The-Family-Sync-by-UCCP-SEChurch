@@ -1,27 +1,49 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 
-export function compressUnder1MB(dataUrl) {
+// The members API caps the JSON body at 128 KB (app/api/members/route.js).
+// Base64 inflates image bytes by ~33%, so target the data-URL string itself and
+// leave headroom for the other form fields and JSON syntax.
+export const PHOTO_DATA_URL_TARGET = 96 * 1024
+
+function encodeJpeg(img, width, height, quality) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(img, 0, 0, width, height)
+  return canvas.toDataURL('image/jpeg', quality)
+}
+
+/**
+ * Shrink a data-URL image until the resulting string fits `targetBytes`,
+ * whatever the source resolution. JPEG quality is lowered first (keeps the
+ * crop crisp), then pixel dimensions, with a tiny guaranteed fallback so the
+ * promise always resolves under the target.
+ */
+export function compressPhoto(dataUrl, targetBytes = PHOTO_DATA_URL_TARGET) {
   return new Promise(resolve => {
     const img = new Image()
     img.onload = () => {
-      let w = img.naturalWidth, h = img.naturalHeight
-      let quality = 0.92
-      let result = dataUrl
-      for (let attempt = 0; attempt < 8; attempt++) {
-        const canvas = document.createElement('canvas')
-        canvas.width = w
-        canvas.height = h
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, w, h)
-        result = canvas.toDataURL('image/jpeg', quality)
-        if (result.length < 1_000_000) break
-        quality -= 0.12
-        w = Math.round(w * 0.85)
-        h = Math.round(h * 0.85)
+      let width = img.naturalWidth || 1
+      let height = img.naturalHeight || 1
+
+      for (const quality of [0.92, 0.82, 0.72, 0.62, 0.52, 0.42, 0.32]) {
+        const result = encodeJpeg(img, width, height, quality)
+        if (result.length <= targetBytes) return resolve(result)
       }
-      resolve(result)
+
+      for (let i = 0; i < 12; i++) {
+        width = Math.max(1, Math.round(width * 0.8))
+        height = Math.max(1, Math.round(height * 0.8))
+        const result = encodeJpeg(img, width, height, 0.6)
+        if (result.length <= targetBytes) return resolve(result)
+      }
+
+      // Always meet the target, even for a pathological source image.
+      resolve(encodeJpeg(img, 16, 16, 0.5))
     }
+    img.onerror = () => resolve(dataUrl)
     img.src = dataUrl
   })
 }
@@ -169,7 +191,7 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
     img.onload = async () => {
       ctx.drawImage(img, x, y, size, size, 0, 0, size, size)
       const rawDataUrl = canvas.toDataURL('image/jpeg', 0.92)
-      const compressed = await compressUnder1MB(rawDataUrl)
+      const compressed = await compressPhoto(rawDataUrl)
       onCrop(compressed)
     }
     img.src = imageSrc

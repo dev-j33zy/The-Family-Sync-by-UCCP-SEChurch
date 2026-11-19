@@ -132,7 +132,8 @@ history if the repository is shared.
 
 ## 9. Operational checklist
 
-- [ ] Set `NEXT_PUBLIC_APP_URL` in Vercel Production (emailed links + CSRF).
+- [x] Set `NEXT_PUBLIC_APP_URL` in Vercel Production (emailed links + CSRF).
+      Also mirrored in local `.env.local` so development links match.
 - [ ] Rotate the three MongoDB passwords and scope each user to one database.
 - [ ] Remove Atlas `0.0.0.0/0` access; use Vercel integration or a static IP.
 - [ ] Set `WIDGET_API_KEY` only if legacy widgets still need `/api/public/events`;

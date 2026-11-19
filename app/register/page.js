@@ -3,6 +3,7 @@ import { useState, useMemo, useRef } from 'react'
 import { calculateAge, renderDatePickerHeader, membershipYearToDate, membershipDateToYear, isValidMembershipDate } from '@/lib/utils'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
+import PhotoCropperModal from '@/components/PhotoCropper'
 
 function parseDateString(str) {
   if (!str) return null
@@ -144,6 +145,7 @@ export default function RegisterPage() {
   const [matchedMember, setMatchedMember] = useState(null)
   const [selectedFields, setSelectedFields] = useState([])
   const fileInputRef = useRef(null)
+  const [cropImage, setCropImage] = useState(null)
 
   const [spouseSearch, setSpouseSearch] = useState('')
   const [spouseSuggestions, setSpouseSuggestions] = useState([])
@@ -228,11 +230,14 @@ export default function RegisterPage() {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = (ev) => {
-      set('profile_picture', ev.target.result)
-    }
+    reader.onload = (ev) => setCropImage(ev.target.result)
     reader.readAsDataURL(file)
     e.target.value = ''
+  }
+
+  function handleCropDone(dataUrl) {
+    set('profile_picture', dataUrl)
+    setCropImage(null)
   }
 
   function handleAcceptDisclaimer() {
@@ -255,6 +260,7 @@ export default function RegisterPage() {
     setConfirmModal(null)
     setCreatedMemberId(null)
     setSuccessNote('')
+    setCropImage(null)
   }
 
   async function handleSubmit(e) {
@@ -915,6 +921,14 @@ export default function RegisterPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {cropImage && (
+        <PhotoCropperModal
+          imageSrc={cropImage}
+          onCrop={handleCropDone}
+          onCancel={() => setCropImage(null)}
+        />
       )}
     </div>
   )

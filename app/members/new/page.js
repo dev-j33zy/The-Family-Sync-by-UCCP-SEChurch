@@ -1,7 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
-import { PlusIcon } from '@/components/Icons'
+import { PlusIcon, CameraIcon } from '@/components/Icons'
+import PhotoCropperModal from '@/components/PhotoCropper'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { todayDateString, membershipYearToDate, isValidMembershipDate } from '@/lib/utils'
@@ -25,6 +26,7 @@ const EMPTY_FORM = {
   village: '',
   barangay: '',
   city: '',
+  profile_picture: '',
 }
 
 export default function NewMemberPage() {
@@ -32,9 +34,25 @@ export default function NewMemberPage() {
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const fileInputRef = useRef(null)
+  const [cropImage, setCropImage] = useState(null)
 
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => setCropImage(ev.target.result)
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  function handleCropDone(dataUrl) {
+    set('profile_picture', dataUrl)
+    setCropImage(null)
   }
 
   async function handleSubmit(e) {
@@ -249,6 +267,43 @@ export default function NewMemberPage() {
                   </div>
                 </div>
 
+                {/* ── PROFILE PHOTO ── */}
+                <div className="form-section">
+                  <div className="form-section-title">Profile Photo <span style={{ fontWeight: 400, color: 'var(--text-muted)', textTransform: 'none', fontSize: '0.75rem', letterSpacing: 0 }}>(optional)</span></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        width: '100px', height: '100px', borderRadius: '50%', overflow: 'hidden',
+                        background: 'var(--bg-input)', border: '2px dashed var(--border)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', flexShrink: 0,
+                      }}
+                    >
+                      {form.profile_picture ? (
+                        <img src={form.profile_picture} alt="Profile"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <CameraIcon size={28} style={{ color: 'var(--text-muted)' }} />
+                      )}
+                    </div>
+                    <div>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => fileInputRef.current?.click()}>
+                        {form.profile_picture ? 'Change Photo' : 'Add Photo'}
+                      </button>
+                      {form.profile_picture && (
+                        <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: '8px' }}
+                          onClick={() => set('profile_picture', '')}>Remove</button>
+                      )}
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                        JPEG or PNG — cropped and compressed automatically
+                      </div>
+                    </div>
+                  </div>
+                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png" style={{ display: 'none' }}
+                    onChange={handleFileSelect} />
+                </div>
+
                 {/* ── ACTIONS ── */}
                 <div className="form-actions">
                   <button type="button" className="btn btn-ghost" onClick={() => router.back()}>
@@ -263,6 +318,14 @@ export default function NewMemberPage() {
           </div>
         </div>
       </main>
+
+      {cropImage && (
+        <PhotoCropperModal
+          imageSrc={cropImage}
+          onCrop={handleCropDone}
+          onCancel={() => setCropImage(null)}
+        />
+      )}
     </div>
   )
 }
