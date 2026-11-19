@@ -24,12 +24,12 @@ const isDev = process.env.NODE_ENV === 'development'
 // script in app/layout.js is inline too. With statically generated pages the
 // documented approach is 'unsafe-inline' for scripts/styles (nonces would
 // force every page to be dynamic). Everything else stays locked down.
-// Keep this list in sync with app/layout.js and globals.css (Google Fonts).
+// Keep this list in sync with app/layout.js (fonts are self-hosted by next/font).
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
   "img-src 'self' data: blob:",
   "connect-src 'self'",
   "object-src 'none'",

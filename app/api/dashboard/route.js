@@ -7,22 +7,29 @@ export async function GET(request) {
   try {
     const { FamilyGroup, Member, Relationship } = await modelsFor('members')
 
-    const { user, response } = await requireAdmin(request)
+    const { response } = await requireAdmin(request)
     if (response) return response
 
-    const members = await Member.find(
-      {},
-      `first_name last_name middle_name prefix date_of_birth wedding_anniversary
-       relationship_status membership_type membership_status registered_at`
-    )
-      .collation({ locale: 'en', strength: 2 })
-      .sort({ last_name: 1, first_name: 1 })
-      .lean()
-
-    const relationships = await Relationship.find(
-      {},
-      'member_id related_member_id relationship_type'
-    ).lean()
+    // These three reads are independent — run them concurrently instead of
+    // waiting for each cluster round-trip one after another.
+    const [members, relationships, familyGroups] = await Promise.all([
+      Member.find(
+        {},
+        `first_name last_name middle_name prefix date_of_birth wedding_anniversary
+         relationship_status membership_type membership_status registered_at`
+      )
+        .collation({ locale: 'en', strength: 2 })
+        .sort({ last_name: 1, first_name: 1 })
+        .lean(),
+      Relationship.find(
+        {},
+        'member_id related_member_id relationship_type'
+      ).lean(),
+      FamilyGroup.find({}, 'name')
+        .collation({ locale: 'en', strength: 2 })
+        .sort({ name: 1 })
+        .lean(),
+    ])
 
     const memberById = new Map(members.map(m => [String(m._id), m]))
 
@@ -49,11 +56,6 @@ export async function GET(request) {
       registered_at: member.registered_at,
       spouse_name: spouseMap[String(member._id)] || null,
     }))
-
-    const familyGroups = await FamilyGroup.find({}, 'name')
-      .collation({ locale: 'en', strength: 2 })
-      .sort({ name: 1 })
-      .lean()
 
     const stats = {
       total: members.length,

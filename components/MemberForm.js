@@ -3,8 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { calculateAge, formatDateInput, renderDatePickerHeader } from '@/lib/utils'
 import { SaveIcon, PlusIcon, CameraIcon } from '@/components/Icons'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
+import DatePicker from '@/components/DatePicker'
 import PhotoCropperModal from '@/components/PhotoCropper'
 
 function parseDateString(str) {

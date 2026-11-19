@@ -1,10 +1,9 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import * as XLSX from 'xlsx'
 import Sidebar from '@/components/Sidebar'
 import { useTheme } from '@/components/ThemeProvider'
-import { fetchUser } from '@/lib/api'
+import { useUser } from '@/components/UserProvider'
 import { parseDateValue, toDateOnlyString, getStatusLabel } from '@/lib/utils'
 import { passwordProblem } from '@/lib/password-policy'
 import { memberDuplicateKey } from '@/lib/member-duplicate'
@@ -170,9 +169,9 @@ function mapHeaders(headers) {
 export default function SettingsPage() {
   const router = useRouter()
   const { theme, devToolsVisible, toggleTheme, toggleDevTools, mounted } = useTheme()
+  const { user, loading: userLoading, setUser } = useUser()
   const fileInputRef = useRef(null)
 
-  const [user, setUser] = useState(null)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -192,17 +191,24 @@ export default function SettingsPage() {
   const [exporting, setExporting] = useState(null)
   const [exportProgress, setExportProgress] = useState(null)
 
+  // The root UserProvider already fetched /api/auth/me once — reuse it instead
+  // of making a second round-trip on every visit to Settings.
   useEffect(() => {
-    async function load() {
-      const fetched = await fetchUser()
-      if (!fetched) { router.push('/login'); return }
-      setUser(fetched)
-      setFirstName(fetched.first_name || '')
-      setLastName(fetched.last_name || '')
-      setEmail(fetched.email || '')
+    let cancelled = false
+    async function syncUser() {
+      if (userLoading) return
+      if (!user) { router.push('/login'); return }
+      // Defer to a microtask so this doesn't synchronously cascade into another
+      // render while the provider is still settling its own state.
+      await Promise.resolve()
+      if (cancelled) return
+      setFirstName(user.first_name || '')
+      setLastName(user.last_name || '')
+      setEmail(user.email || '')
     }
-    load()
-  }, [])
+    syncUser()
+    return () => { cancelled = true }
+  }, [user, userLoading, router])
 
   // Only administrators can open /admin/create-user; keep the shortcut in
   // step with that page instead of offering it to everyone.
@@ -295,6 +301,8 @@ export default function SettingsPage() {
     reader.onload = async function (evt) {
       setImportProgress({ message: 'Parsing file...', percent: 40 })
       try {
+        // XLSX is ~500 KB — only load it when a file is actually selected.
+        const XLSX = await import('xlsx')
         const data = new Uint8Array(evt.target.result)
         const workbook = XLSX.read(data, { type: 'array', cellDates: true })
         setImportProgress({ message: 'Processing data...', percent: 70 })
@@ -556,7 +564,9 @@ export default function SettingsPage() {
     setExportProgress({ message: 'Fetching members\u2026', percent: 20 })
 
     try {
-      const res = await fetch('/api/members')
+      // Load the workbook library and the member data in parallel, and only
+      // when an export is actually requested.
+      const [XLSX, res] = await Promise.all([import('xlsx'), fetch('/api/members')])
       const members = await res.json()
       if (!res.ok) throw new Error(members.error || 'Failed to fetch members')
       if (!members.length) throw new Error('There are no members to export yet.')

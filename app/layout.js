@@ -1,6 +1,13 @@
 import './globals.css'
+import { Inter } from 'next/font/google'
 import ThemeProvider from '@/components/ThemeProvider'
 import UserProvider from '@/components/UserProvider'
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+})
 
 export const metadata = {
   title: 'The Family Sync',
@@ -16,7 +23,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <script dangerouslySetInnerHTML={{

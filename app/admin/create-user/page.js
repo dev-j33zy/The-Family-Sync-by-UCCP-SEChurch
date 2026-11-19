@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
-import { fetchUser } from '@/lib/api'
+import { useUser } from '@/components/UserProvider'
 import { UsersIcon, ArrowLeftIcon, SaveIcon, TrashIcon, CheckIcon } from '@/components/Icons'
 
 function formatDate(value) {
@@ -14,6 +14,7 @@ function formatDate(value) {
 
 export default function CreateUserPage() {
   const router = useRouter()
+  const { user, loading: userLoading } = useUser()
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -46,13 +47,19 @@ export default function CreateUserPage() {
   const [adminsLoading, setAdminsLoading] = useState(true)
 
   useEffect(() => {
-    async function load() {
-      const fetched = await fetchUser()
-      if (!fetched) { router.push('/login'); return }
-      setTestEmail(fetched.email || '')
+    let cancelled = false
+    async function syncUser() {
+      if (userLoading) return
+      if (!user) { router.push('/login'); return }
+      // Defer to a microtask so this doesn't synchronously cascade into another
+      // render while the provider is still settling its own state.
+      await Promise.resolve()
+      if (cancelled) return
+      setTestEmail(user.email || '')
     }
-    load()
-  }, [])
+    syncUser()
+    return () => { cancelled = true }
+  }, [user, userLoading, router])
 
   useEffect(() => {
     fetch('/api/admin/list-users')

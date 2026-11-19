@@ -7,8 +7,7 @@ import { PlusIcon, TreeIcon } from '@/components/Icons'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
+import DatePicker from '@/components/DatePicker'
 
 function parseDateString(str) {
   if (!str) return null
@@ -633,7 +632,19 @@ function FamilyTreeView() {
 
 export default function FamilyTreePage() {
   return (
-    <Suspense fallback={<div style={{ background: 'var(--bg-primary)', minHeight: '100vh' }} />}>
+    <Suspense fallback={
+      <div className="app-layout" aria-hidden="true">
+        <aside className="sidebar skeleton" />
+        <main className="main-content">
+          <div className="page-wrapper">
+            <div className="page-header">
+              <div className="skeleton" style={{ width: 230, height: 30, borderRadius: 6 }} />
+            </div>
+            <div className="card skeleton" style={{ height: '60vh' }} />
+          </div>
+        </main>
+      </div>
+    }>
       <FamilyTreeView />
     </Suspense>
   )

@@ -1,8 +1,7 @@
 'use client'
 import { useState, useMemo, useRef } from 'react'
 import { calculateAge, renderDatePickerHeader, membershipYearToDate, membershipDateToYear, isValidMembershipDate } from '@/lib/utils'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
+import DatePicker from '@/components/DatePicker'
 import PhotoCropperModal from '@/components/PhotoCropper'
 
 function parseDateString(str) {
