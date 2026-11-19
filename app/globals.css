@@ -766,7 +766,7 @@ img { max-width: 100%; display: block; }
 .form-grid-names {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 1.25fr 1.25fr 1fr 0.75fr;
+  grid-template-columns: 1.4fr 1.4fr 0.85fr 0.55fr;
   gap: 16px;
 }
 
