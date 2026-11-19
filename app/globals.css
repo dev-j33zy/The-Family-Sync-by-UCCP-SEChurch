@@ -949,6 +949,7 @@ img { max-width: 100%; display: block; }
   width: 36px;
   height: 36px;
   border-radius: 50%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1500,6 +1501,7 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
   width: 72px;
   height: 72px;
   border-radius: 50%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;

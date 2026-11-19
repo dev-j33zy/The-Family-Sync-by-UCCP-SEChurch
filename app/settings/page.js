@@ -10,6 +10,7 @@ import { passwordProblem } from '@/lib/password-policy'
 import { memberDuplicateKey } from '@/lib/member-duplicate'
 import { memberExportMatrix, memberExportTitle } from '@/lib/member-export'
 import { SaveIcon, SunIcon, MoonIcon, UploadIcon, PdfFileIcon, GoogleSheetsIcon, ExcelFileIcon, CsvFileIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
+import PendingPhotoReview from '@/components/PendingPhotoReview'
 
 const COLUMN_MAP = {
   'last name': 'last_name',
@@ -925,6 +926,8 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              {canManageUsers && <PendingPhotoReview />}
 
               {canManageUsers && (
                 <div className="card">

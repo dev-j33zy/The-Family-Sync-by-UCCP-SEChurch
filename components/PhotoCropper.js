@@ -53,7 +53,7 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
   const [imgNatural, setImgNatural] = useState({ w: 0, h: 0 })
   const [cropRect, setCropRect] = useState({ x: 0, y: 0, size: 0 })
   const [saving, setSaving] = useState(false)
-  const [containerW, setContainerW] = useState(500)
+  const [containerSize, setContainerSize] = useState({ w: 500, h: 500 })
 
   useEffect(() => {
     const img = new Image()
@@ -71,16 +71,24 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
     img.src = imageSrc
   }, [imageSrc])
 
+  // Measure the image area actually rendered on screen. The dark overlay and
+  // the crop box must share one pixel scale or they drift apart on small
+  // screens (where the modal's available width changes).
   useEffect(() => {
-    if (!containerRef.current) return
-    const resize = () => setContainerW(Math.min(containerRef.current.clientWidth, 500))
-    resize()
-    window.addEventListener('resize', resize)
-    return () => window.removeEventListener('resize', resize)
+    const el = containerRef.current
+    if (!el) return
+    const measure = () => setContainerSize({ w: el.clientWidth, h: el.clientHeight })
+    measure()
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(measure)
+      observer.observe(el)
+      return () => observer.disconnect()
+    }
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
   }, [])
 
-  const scale = imgNatural.w ? containerW / imgNatural.w : 1
-  const displayH = imgNatural.w ? Math.round(containerW * (imgNatural.h / imgNatural.w)) : containerW
+  const scale = imgNatural.w && containerSize.w ? containerSize.w / imgNatural.w : 1
 
   function constrain(v, min, max) { return Math.max(min, Math.min(max, v)) }
 
@@ -209,7 +217,7 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
           <h2 className="modal-title">Crop Photo</h2>
           <button className="modal-close" onClick={onCancel}>×</button>
         </div>
-        <div className="modal-body" style={{ padding: '44px 46px' }}>
+        <div className="modal-body">
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
             Drag the square or its corner handles to select the crop area — handles may extend past the image edges
           </p>
@@ -242,7 +250,8 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
                 />
 
                 <svg
-                  viewBox={`0 0 ${containerW} ${displayH}`}
+                  viewBox={`0 0 ${containerSize.w} ${containerSize.h}`}
+                  preserveAspectRatio="none"
                   style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', borderRadius: 'var(--radius-sm)' }}
                 >
                   <defs>

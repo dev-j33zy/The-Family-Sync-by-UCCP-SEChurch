@@ -374,6 +374,30 @@ export default function RegisterPage() {
     setCreatedMemberId(null)
   }
 
+  // Existing members cannot be edited by the public, so a photo picked during
+  // registration is held for staff review instead of being silently discarded.
+  async function submitPendingPhoto() {
+    const photo = form.profile_picture
+    if (!photo || !photo.startsWith('data:') || !matchedMember?.id) return false
+    try {
+      const res = await fetch('/api/photos/pending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          member_id: matchedMember.id,
+          photo,
+          first_name: form.first_name,
+          last_name: form.last_name,
+          date_of_birth: form.date_of_birth,
+          email: form.email,
+        }),
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  }
+
   async function handleUpdateExisting() {
     if (!matchedMember) return
     setSaving(true)
@@ -388,6 +412,12 @@ export default function RegisterPage() {
       const fieldsToUpdate = candidates.filter(key => (form[key] ?? '') !== '')
 
       if (fieldsToUpdate.length === 0) {
+        const queued = await submitPendingPhoto()
+        setSuccessNote(
+          queued
+            ? 'Your photo was sent to the church office for review.'
+            : 'No changes were needed.'
+        )
         setStep('success')
         setSaving(false)
         return
@@ -405,9 +435,18 @@ export default function RegisterPage() {
       })
 
       if (res.status === 401 || res.status === 403) {
-        setError(
-          'For privacy, existing records can only be corrected by church staff. Please contact the church office, or choose "Register as New" to submit a fresh entry.'
-        )
+        const queued = await submitPendingPhoto()
+        if (queued) {
+          setError('')
+          setSuccessNote(
+            'Your photo was sent to the church office for review. For privacy, other existing records can only be corrected by church staff.'
+          )
+          setStep('success')
+        } else {
+          setError(
+            'For privacy, existing records can only be corrected by church staff. Please contact the church office, or choose "Register as New" to submit a fresh entry.'
+          )
+        }
         setSaving(false)
         return
       }

@@ -51,6 +51,18 @@ headers.
   header and uses `NEXT_PUBLIC_APP_URL` (or a pinned fallback). URLs are escaped
   before being placed in HTML attributes.
 
+### Pending photo updates from public registrants
+
+When someone registers details that match an existing member, the photo they
+pick is **not** applied to that record. It is rate-limited (`10/hour/IP`), the
+submitter must supply a matching first name, last name and date of birth, and
+the bytes are stored in a separate `PendingPhoto` collection in the images
+cluster. Staff review it from the member detail page or Settings; only
+`approve` copies the bytes into the normal image store and flags the member,
+while `reject` deletes the proposal. Both decisions are written to the
+`[security]` log as `photo.pending.reviewed`. Previews and decisions are
+admin-only (`requireAdmin`), and the queue response never contains photo bytes.
+
 ## 4. Abuse and detection (`lib/rate-limit.js`, `lib/audit.js`)
 
 Per-address fixed windows cover login, forgot/reset, account password checks,
@@ -135,7 +147,8 @@ history if the repository is shared.
 - [x] Set `NEXT_PUBLIC_APP_URL` in Vercel Production (emailed links + CSRF).
       Also mirrored in local `.env.local` so development links match.
 - [ ] Rotate the three MongoDB passwords and scope each user to one database.
-- [ ] Remove Atlas `0.0.0.0/0` access; use Vercel integration or a static IP.
+- [ ] Atlas `0.0.0.0/0` access is temporary and auto-expires in ~6 days. Confirm
+      it has actually expired, then use Vercel integration or a static IP.
 - [ ] Set `WIDGET_API_KEY` only if legacy widgets still need `/api/public/events`;
       retire it once they have been upgraded to `/api/widget/events`.
 - [ ] Rotate any credential that ever appeared in an old widget installer.

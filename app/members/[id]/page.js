@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { calculateAge, formatDate, capitalize, getFullName, getRelationshipLabel, membershipDateToInput, getStatusLabel } from '@/lib/utils'
 import { PlusIcon, EditIcon, TrashIcon, TreeIcon, FrownIcon } from '@/components/Icons'
+import PendingPhotoReview from '@/components/PendingPhotoReview'
 import Link from 'next/link'
 
 function DetailField({ label, value }) {
@@ -124,6 +125,8 @@ export default function MemberDetailPage({ params }) {
             <Link href="/members" className="btn btn-ghost btn-sm">← Members</Link>
             <Link href="/members/new" className="btn btn-primary page-action-btn"><PlusIcon size={16} /> Add Member</Link>
           </div>
+
+          <PendingPhotoReview memberId={id} />
 
           <div className="member-detail-grid">
             {/* Main card */}
