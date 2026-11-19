@@ -93,23 +93,19 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
   function constrain(v, min, max) { return Math.max(min, Math.min(max, v)) }
 
   const MIN_SIZE = 50
-  // Corner handles may be dragged past the image edges so the crop can include
-  // the outermost edge/corner pixels (or fully cover a non-square image). Cap
-  // the size and require a small overlap so a crop can never be entirely blank.
-  const MAX_SIZE = imgNatural.w ? Math.round(Math.max(imgNatural.w, imgNatural.h) * 2) : 1
+  // The viewfinder always stays inside the image. Corner handles can be dragged
+  // past an edge, but the square stops growing when its border meets the image
+  // boundary — that is what lets the outermost edge/corner pixels be selected.
+  const MAX_SIZE = imgNatural.w ? Math.max(imgNatural.w, imgNatural.h) : 1
 
   function clampSize(s) {
     return Math.round(constrain(s, MIN_SIZE, MAX_SIZE))
   }
 
-  function clampAxis(v, min, max) {
-    return max <= min ? min : constrain(v, min, max)
-  }
-
-  function clampPosition(x, y, size) {
+  function clampToImage(x, y, size) {
     return {
-      x: clampAxis(x, -(size - MIN_SIZE), imgNatural.w - MIN_SIZE),
-      y: clampAxis(y, -(size - MIN_SIZE), imgNatural.h - MIN_SIZE),
+      x: constrain(x, 0, Math.max(0, imgNatural.w - size)),
+      y: constrain(y, 0, Math.max(0, imgNatural.h - size)),
       size,
     }
   }
@@ -122,34 +118,35 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
       const dx = (ev.clientX - startX) / scale
       const dy = (ev.clientY - startY) / scale
 
-      // The opposite corner stays anchored; the dragged corner follows the
-      // pointer and is allowed to go outside the image borders.
+      // The opposite corner stays anchored. Pointer movement may continue past
+      // the image, but each bound below stops the square at the image edge.
       const left = x, top = y, right = x + size, bottom = y + size
+      const { w, h } = imgNatural
       let newX = left, newY = top, newSize = size
 
       switch (corner) {
         case 'se': {
-          newSize = clampSize(Math.min(right + dx - left, bottom + dy - top))
+          newSize = clampSize(Math.min(right + dx - left, bottom + dy - top, w - left, h - top))
           break
         }
         case 'ne': {
-          newSize = clampSize(Math.min(right + dx - left, bottom - (top + dy)))
+          newSize = clampSize(Math.min(right + dx - left, bottom - (top + dy), w - left, bottom))
           newY = bottom - newSize
           break
         }
         case 'sw': {
-          newSize = clampSize(Math.min(right - (left + dx), bottom + dy - top))
+          newSize = clampSize(Math.min(right - (left + dx), bottom + dy - top, right, h - top))
           newX = right - newSize
           break
         }
         case 'nw': {
-          newSize = clampSize(Math.min(right - (left + dx), bottom - (top + dy)))
+          newSize = clampSize(Math.min(right - (left + dx), bottom - (top + dy), right, bottom))
           newX = right - newSize
           newY = bottom - newSize
           break
         }
       }
-      setCropRect(clampPosition(newX, newY, newSize))
+      setCropRect(clampToImage(newX, newY, newSize))
     }
 
     function onUp() {
@@ -167,7 +164,7 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
     function onMove(ev) {
       const dx = (ev.clientX - startX) / scale
       const dy = (ev.clientY - startY) / scale
-      setCropRect(clampPosition(x + dx, y + dy, size))
+      setCropRect(clampToImage(x + dx, y + dy, size))
     }
 
     function onUp() {
@@ -183,7 +180,7 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
     const cx = (e.clientX - rect.left) / scale
     const cy = (e.clientY - rect.top) / scale
     const s = cropRect.size
-    return clampPosition(cx - s / 2, cy - s / 2, s)
+    return clampToImage(cx - s / 2, cy - s / 2, s)
   }
 
   async function handleCrop() {
@@ -195,10 +192,6 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
     canvas.width = size
     canvas.height = size
     const ctx = canvas.getContext('2d')
-    // Any part of the square that falls past an image edge becomes white
-    // padding instead of a black bar.
-    ctx.fillStyle = '#fff'
-    ctx.fillRect(0, 0, size, size)
 
     const img = new Image()
     img.onload = async () => {
@@ -219,7 +212,7 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
         </div>
         <div className="modal-body">
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
-            Drag the square or its corner handles to select the crop area — handles may extend past the image edges
+            Drag the square to move it, or drag a corner handle to resize up to the image edges
           </p>
           <div ref={containerRef} style={{ position: 'relative', width: '100%', userSelect: 'none' }}>
             {imgNatural.w ? (
@@ -238,7 +231,7 @@ export default function PhotoCropper({ imageSrc, onCrop, onCancel }) {
                     function onMove(ev) {
                       const dx = (ev.clientX - startX) / scale
                       const dy = (ev.clientY - startY) / scale
-                      setCropRect(clampPosition(snapped.x + dx, snapped.y + dy, snapped.size))
+                      setCropRect(clampToImage(snapped.x + dx, snapped.y + dy, snapped.size))
                     }
                     function onUp() {
                       window.removeEventListener('pointermove', onMove)
