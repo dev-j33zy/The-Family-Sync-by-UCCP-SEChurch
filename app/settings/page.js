@@ -11,6 +11,13 @@ import { memberExportMatrix, memberExportTitle } from '@/lib/member-export'
 import { SaveIcon, SunIcon, MoonIcon, UploadIcon, PdfFileIcon, GoogleSheetsIcon, ExcelFileIcon, CsvFileIcon, FileIcon, AlertCircleIcon, PlusIcon } from '@/components/Icons'
 import PendingPhotoReview from '@/components/PendingPhotoReview'
 
+const SETTINGS_TABS = [
+  { id: 'account', label: 'Account' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'data', label: 'Data Management' },
+  { id: 'developer', label: 'Developer' },
+]
+
 const COLUMN_MAP = {
   'last name': 'last_name',
   'lastname': 'last_name',
@@ -190,6 +197,8 @@ export default function SettingsPage() {
   // 'pdf' | 'sheets' | null — one export at a time, each with its own button.
   const [exporting, setExporting] = useState(null)
   const [exportProgress, setExportProgress] = useState(null)
+
+  const [activeTab, setActiveTab] = useState('account')
 
   // The root UserProvider already fetched /api/auth/me once — reuse it instead
   // of making a second round-trip on every visit to Settings.
@@ -669,15 +678,17 @@ export default function SettingsPage() {
               <h1 className="page-title" style={{ margin: 0 }}>Settings</h1>
               <p className="page-subtitle">Manage your account and preferences</p>
             </div>
-            <button
-              type="submit"
-              form="settings-form"
-              className="btn btn-primary page-action-btn"
-              disabled={saving}
-            >
-              <SaveIcon size={18} />
-              {saving ? 'Saving\u2026' : 'Save Settings'}
-            </button>
+            {activeTab === 'account' && (
+              <button
+                type="submit"
+                form="settings-form"
+                className="btn btn-primary page-action-btn"
+                disabled={saving}
+              >
+                <SaveIcon size={18} />
+                {saving ? 'Saving\u2026' : 'Save Settings'}
+              </button>
+            )}
           </div>
 
           {message && (
@@ -692,8 +703,25 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Data Management Section */}
-          <div className="card" style={{ marginBottom: '24px' }}>
+          <div className="settings-tabs" role="tablist" aria-label="Settings sections">
+            {SETTINGS_TABS.map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                id={`settings-tab-${tab.id}`}
+                aria-controls={`settings-panel-${tab.id}`}
+                aria-selected={activeTab === tab.id}
+                className="settings-tab"
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'data' && (
+          <div role="tabpanel" id="settings-panel-data" aria-labelledby="settings-tab-data" className="card">
             <div className="card-header">
               <h2 className="card-title" style={{ margin: 0 }}>Data Management</h2>
             </div>
@@ -799,7 +827,10 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+          )}
 
+          {activeTab === 'account' && (
+          <div role="tabpanel" id="settings-panel-account" aria-labelledby="settings-tab-account">
           <form id="settings-form" onSubmit={handleSave}>
             <div className="settings-grid">
               <div className="card">
@@ -886,8 +917,12 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          </form>
+          </div>
+          )}
 
-            <div className="card" style={{ marginTop: '24px' }}>
+          {activeTab === 'appearance' && (
+          <div role="tabpanel" id="settings-panel-appearance" aria-labelledby="settings-tab-appearance" className="card">
               <div className="card-header">
                 <h2 className="card-title" style={{ margin: 0 }}>Appearance</h2>
               </div>
@@ -915,8 +950,10 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="settings-grid" style={{ marginTop: '24px' }}>
+          {activeTab === 'developer' && (
+          <div role="tabpanel" id="settings-panel-developer" aria-labelledby="settings-tab-developer" className="settings-grid">
               <div className="card">
                 <div className="card-header">
                   <h2 className="card-title" style={{ margin: 0 }}>Developer</h2>
@@ -960,8 +997,8 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
-            </div>
-          </form>
+          </div>
+          )}
         </div>
       </main>
 
