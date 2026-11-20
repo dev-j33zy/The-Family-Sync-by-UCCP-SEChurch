@@ -2310,8 +2310,14 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
     border-bottom: 1px solid var(--border);
     z-index: 101;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     padding: 0 16px;
+  }
+
+  .mobile-topbar-brand {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
   }
   
   .hamburger-btn {
@@ -2325,6 +2331,8 @@ html.dev-tools-visible [data-nextjs-dev-tools] {
     align-items: center;
     justify-content: center;
     transition: color 0.2s;
+    position: relative;
+    z-index: 1;
   }
   
   .hamburger-btn:hover { color: var(--primary); }

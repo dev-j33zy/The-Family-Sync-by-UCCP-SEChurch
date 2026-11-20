@@ -43,7 +43,15 @@ export default function Sidebar() {
     <>
       {/* Mobile Topbar */}
       <div className="mobile-topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button
+          className="hamburger-btn"
+          onClick={() => setIsOpen(!isOpen)}
+          aria-label={isOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={isOpen}
+        >
+          {isOpen ? <XIcon size={20} /> : <MenuIcon size={20} />}
+        </button>
+        <div className="mobile-topbar-brand" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div className="sidebar-logo-mark" style={{ width: '32px', height: '32px', fontSize: '0.75rem', marginBottom: 0 }}>SEC</div>
           <div>
             <div className="sidebar-brand">
@@ -52,9 +60,6 @@ export default function Sidebar() {
             <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '1px' }}>by UCCP Sukat</div>
           </div>
         </div>
-        <button className="hamburger-btn" onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? <XIcon size={20} /> : <MenuIcon size={20} />}
-        </button>
       </div>
 
       {/* Mobile Overlay */}
