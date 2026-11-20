@@ -12,6 +12,7 @@ import { notifyPasswordChanged } from '@/lib/account-mail'
 import { passwordProblem } from '@/lib/password-policy'
 import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { serializeUser } from '@/lib/serialize'
+import { cleanText } from '@/lib/validate'
 
 function maskEmail(email) {
   const [local = '', domain = ''] = String(email || '').split('@')
@@ -59,9 +60,25 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}))
     const token = body.token
     const password = String(body.password || '')
+    const firstName = cleanText(body.first_name, 100)
+    const lastName = cleanText(body.last_name, 100)
 
     if (!token) {
       return NextResponse.json({ error: 'This link is incomplete. Request a new one.' }, { status: 400 })
+    }
+
+    // Burning the token happens only after the input is valid, so a short
+    // password or missing invite name does not waste the link.
+    const peek = await peekAuthToken(token)
+    if (!peek) {
+      return NextResponse.json(
+        { error: 'This link is invalid, already used, or expired. Request a new one.' },
+        { status: 400 }
+      )
+    }
+
+    if (peek.purpose === 'invite' && (!firstName || !lastName)) {
+      return NextResponse.json({ error: 'First name and last name are required' }, { status: 400 })
     }
 
     const problem = passwordProblem(password)
@@ -69,8 +86,6 @@ export async function POST(request) {
       return NextResponse.json({ error: problem }, { status: 400 })
     }
 
-    // Burning the token happens only after the input is valid, so a short
-    // password does not waste the link.
     const found = await consumeAuthToken(token)
     if (!found) {
       return NextResponse.json(
@@ -96,6 +111,11 @@ export async function POST(request) {
       password_changed_at: now,
     }
     if (!user.email_verified_at) update.email_verified_at = now
+    if (found.purpose === 'invite') {
+      update.first_name = firstName
+      update.last_name = lastName
+      update.display_name = [firstName, lastName].filter(Boolean).join(' ').trim() || null
+    }
 
     const updated = await User.findOneAndUpdate(
       { _id: user._id },

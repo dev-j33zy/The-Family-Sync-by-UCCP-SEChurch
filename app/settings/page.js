@@ -15,7 +15,7 @@ const SETTINGS_TABS = [
   { id: 'account', label: 'Account' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'data', label: 'Data Management' },
-  { id: 'developer', label: 'Developer' },
+  { id: 'admin', label: 'Admin' },
 ]
 
 const COLUMN_MAP = {
@@ -952,11 +952,11 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeTab === 'developer' && (
-          <div role="tabpanel" id="settings-panel-developer" aria-labelledby="settings-tab-developer" className="settings-grid">
+          {activeTab === 'admin' && (
+          <div role="tabpanel" id="settings-panel-admin" aria-labelledby="settings-tab-admin" className="settings-grid">
               <div className="card">
                 <div className="card-header">
-                  <h2 className="card-title" style={{ margin: 0 }}>Developer</h2>
+                  <h2 className="card-title" style={{ margin: 0 }}>Admin</h2>
                 </div>
                 <div className="card-body">
                   <div className="form-group">

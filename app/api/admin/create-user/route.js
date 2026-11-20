@@ -8,7 +8,7 @@ import { issueAuthToken } from '@/lib/auth-tokens'
 import { sendInviteEmail } from '@/lib/account-mail'
 import { emailConfigured } from '@/lib/email'
 import { serializeUser } from '@/lib/serialize'
-import { cleanEmail, cleanText, readJson } from '@/lib/validate'
+import { cleanEmail, readJson } from '@/lib/validate'
 import { clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { securityLog, securityContext } from '@/lib/audit'
 
@@ -28,12 +28,12 @@ export async function POST(request) {
     const { value: body, error: bodyError } = await readJson(request)
     if (bodyError) return NextResponse.json({ error: bodyError }, { status: 400 })
 
-    const first_name = cleanText(body.first_name, 100)
-    const last_name = cleanText(body.last_name, 100)
+    // Invites are sent by email address only. The invited admin provides their
+    // name when they open the link and set a password.
     const normalizedEmail = cleanEmail(body.email)
 
-    if (!first_name || !last_name || !normalizedEmail) {
-      return NextResponse.json({ error: 'First name, last name, and email are required' }, { status: 400 })
+    if (!normalizedEmail) {
+      return NextResponse.json({ error: 'A valid email address is required' }, { status: 400 })
     }
 
     const { User } = await modelsFor('admin')
@@ -46,7 +46,6 @@ export async function POST(request) {
     // The account starts with a password nobody knows. The only way in is the
     // invite link, which proves the person can read that inbox.
     const passwordHash = await hashPassword(crypto.randomBytes(32).toString('hex'))
-    const displayName = [first_name, last_name].filter(Boolean).join(' ').trim()
 
     let created
     try {
@@ -54,9 +53,9 @@ export async function POST(request) {
         email: normalizedEmail,
         password_hash: passwordHash,
         role: 'Administrator',
-        first_name: String(first_name).trim(),
-        last_name: String(last_name).trim(),
-        display_name: displayName,
+        first_name: null,
+        last_name: null,
+        display_name: null,
         invited_at: new Date(),
       })
     } catch (err) {

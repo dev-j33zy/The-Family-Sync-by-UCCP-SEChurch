@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { useUser } from '@/components/UserProvider'
-import { UsersIcon, ArrowLeftIcon, SaveIcon, TrashIcon, CheckIcon } from '@/components/Icons'
+import { UsersIcon, ArrowLeftIcon, TrashIcon, CheckIcon } from '@/components/Icons'
 
 function formatDate(value) {
   if (!value) return null
@@ -16,8 +16,6 @@ export default function CreateUserPage() {
   const router = useRouter()
   const { user, loading: userLoading } = useUser()
 
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState(null)
@@ -26,12 +24,6 @@ export default function CreateUserPage() {
   const [inviteUrl, setInviteUrl] = useState(null)
   const [emailError, setEmailError] = useState(null)
   const [copied, setCopied] = useState(false)
-
-  const [resetEmail, setResetEmail] = useState('')
-  const [resetting, setResetting] = useState(false)
-  const [resetMessage, setResetMessage] = useState(null)
-  const [resetFallbackUrl, setResetFallbackUrl] = useState(null)
-  const [resetError, setResetError] = useState(null)
 
   const [testEmail, setTestEmail] = useState('')
   const [testing, setTesting] = useState(false)
@@ -45,6 +37,16 @@ export default function CreateUserPage() {
 
   const [admins, setAdmins] = useState([])
   const [adminsLoading, setAdminsLoading] = useState(true)
+
+  async function refreshAdmins() {
+    setAdminsLoading(true)
+    try {
+      const data = await fetch('/api/admin/list-users').then(r => r.json())
+      if (data?.admins) setAdmins(data.admins)
+    } finally {
+      setAdminsLoading(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -62,10 +64,16 @@ export default function CreateUserPage() {
   }, [user, userLoading, router])
 
   useEffect(() => {
-    fetch('/api/admin/list-users')
-      .then(r => r.json())
-      .then(data => { if (data.admins) setAdmins(data.admins) })
-      .finally(() => setAdminsLoading(false))
+    let cancelled = false
+    ;(async () => {
+      try {
+        const data = await fetch('/api/admin/list-users').then(r => r.json())
+        if (!cancelled && data?.admins) setAdmins(data.admins)
+      } finally {
+        if (!cancelled) setAdminsLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
   }, [])
 
   async function copyLink(url) {
@@ -92,7 +100,7 @@ export default function CreateUserPage() {
       const res = await fetch('/api/admin/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ first_name: firstName, last_name: lastName, email }),
+        body: JSON.stringify({ email }),
       })
 
       const data = await res.json()
@@ -103,51 +111,13 @@ export default function CreateUserPage() {
       setCreatedUser(data.user)
       setInviteUrl(data.email_sent ? null : data.invite_url || null)
       setEmailError(data.email_sent ? null : data.email_error || null)
-      setFirstName('')
-      setLastName('')
       setEmail('')
 
-      const refreshed = await fetch('/api/admin/list-users').then(r => r.json()).catch(() => null)
-      if (refreshed?.admins) setAdmins(refreshed.admins)
+      await refreshAdmins()
     } catch (err) {
       setError(err.message)
     }
     setSubmitting(false)
-  }
-
-  async function handleResetPassword(e) {
-    e.preventDefault()
-    setResetError(null)
-    setResetMessage(null)
-    setResetFallbackUrl(null)
-
-    if (!resetEmail) {
-      setResetError('Please enter an email address')
-      return
-    }
-
-    setResetting(true)
-    try {
-      const res = await fetch('/api/admin/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        // The API hands back a working link when delivery fails, so the admin
-        // can still pass it along.
-        if (data.reset_url) setResetFallbackUrl(data.reset_url)
-        throw new Error(data.error)
-      }
-
-      setResetMessage(data.message)
-    } catch (err) {
-      setResetError(err.message)
-    }
-    setResetting(false)
   }
 
   async function handleTestEmail(e) {
@@ -193,6 +163,7 @@ export default function CreateUserPage() {
       if (!res.ok) throw new Error(data.error)
       setDeleteMessage(data.message)
       setDeleteEmail('')
+      await refreshAdmins()
     } catch (err) {
       setDeleteError(err.message)
     }
@@ -211,7 +182,6 @@ export default function CreateUserPage() {
               </button>
               <div>
                 <h1 className="page-title" style={{ margin: 0 }}>Admin Tools</h1>
-                <p className="page-subtitle">Create new administrators and manage account access</p>
               </div>
             </div>
           </div>
@@ -219,10 +189,9 @@ export default function CreateUserPage() {
           {message && (
             <div className="settings-alert success">
               {message}
-              {createdUser && (
+              {createdUser?.email && (
                 <div style={{ marginTop: '8px', fontSize: '0.85rem' }}>
-                  <strong>Email:</strong> {createdUser.email}<br />
-                  <strong>Name:</strong> {createdUser.first_name} {createdUser.last_name}<br />
+                  <strong>Email:</strong> {createdUser.email}
                 </div>
               )}
               {emailError && (
@@ -255,47 +224,23 @@ export default function CreateUserPage() {
           )}
 
           <div className="settings-grid">
-            {/* Create User Section */}
+            {/* Invite User Admin */}
             <div className="card">
               <div className="card-header">
-                <h2 className="card-title" style={{ margin: 0 }}>Create Admin User</h2>
+                <h2 className="card-title" style={{ margin: 0 }}>Invite a User Admin</h2>
               </div>
               <div className="card-body">
                 <form onSubmit={handleSubmit}>
-                  <div className="form-group">
-                    <label className="form-label">First Name</label>
-                    <input
-                      className="form-input"
-                      placeholder="John"
-                      value={firstName}
-                      onChange={e => setFirstName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Last Name</label>
-                    <input
-                      className="form-input"
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={e => setLastName(e.target.value)}
-                      required
-                    />
-                  </div>
                   <div className="form-group">
                     <label className="form-label">Email Address</label>
                     <input
                       className="form-input"
                       type="email"
-                      placeholder="john@example.com"
+                      placeholder="user@example.com"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       required
                     />
-                    <span className="form-hint">
-                      The user receives an invitation link. Opening it verifies this address
-                      and lets them choose their own password.
-                    </span>
                   </div>
                   <button
                     type="submit"
@@ -304,112 +249,13 @@ export default function CreateUserPage() {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}
                   >
                     <UsersIcon size={18} />
-                    {submitting ? 'Sending invitation…' : 'Create & Invite'}
+                    {submitting ? 'Sending invitation…' : 'Invite a User Admin'}
                   </button>
                 </form>
               </div>
             </div>
 
-            {/* Reset Password Section */}
-            <div className="card">
-              <div className="card-header">
-                <h2 className="card-title" style={{ margin: 0 }}>Reset Password</h2>
-              </div>
-              <div className="card-body">
-                {resetMessage && (
-                  <div className="settings-alert success" style={{ marginBottom: '12px' }}>
-                    {resetMessage}
-                  </div>
-                )}
-                {resetError && (
-                  <div className="settings-alert error" style={{ marginBottom: '16px' }}>
-                    {resetError}
-                  </div>
-                )}
-                {resetFallbackUrl && (
-                  <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
-                      <strong>Reset link:</strong> share this with the user. It expires in 1 hour and works once.
-                    </div>
-                    <code style={{ fontSize: '0.78rem', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                      {resetFallbackUrl}
-                    </code>
-                    <div style={{ marginTop: '8px' }}>
-                      <button type="button" className="btn btn-ghost" onClick={() => copyLink(resetFallbackUrl)}>
-                        {copied ? 'Copied' : 'Copy link'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <form onSubmit={handleResetPassword}>
-                  <div className="form-group">
-                    <label className="form-label">Email Address</label>
-                    <input
-                      className="form-input"
-                      type="email"
-                      placeholder="user@example.com"
-                      value={resetEmail}
-                      onChange={e => setResetEmail(e.target.value)}
-                      required
-                    />
-                    <span className="form-hint">
-                      A single-use link is emailed to this address. Sessions stay signed in
-                      until the link is used.
-                    </span>
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={resetting}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}
-                  >
-                    <SaveIcon size={18} />
-                    {resetting ? 'Sending Reset Link…' : 'Send Reset Link'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            {/* Test Email Section */}
-            <div className="card">
-              <div className="card-header">
-                <h2 className="card-title" style={{ margin: 0 }}>Test Email</h2>
-              </div>
-              <div className="card-body">
-                {testResult && (
-                  <div className="settings-alert success" style={{ marginBottom: '12px' }}>{testResult}</div>
-                )}
-                {testError && (
-                  <div className="settings-alert error" style={{ marginBottom: '12px' }}>{testError}</div>
-                )}
-                <form onSubmit={handleTestEmail}>
-                  <div className="form-group">
-                    <label className="form-label">Send To</label>
-                    <input
-                      className="form-input"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={testEmail}
-                      onChange={e => setTestEmail(e.target.value)}
-                      required
-                    />
-                    <span className="form-hint">
-                      Confirms the Gmail API setup before you invite anyone.
-                    </span>
-                  </div>
-                  <button
-                    type="submit"
-                    className="btn btn-ghost"
-                    disabled={testing}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}
-                  >
-                    {testing ? 'Sending…' : 'Send Test Email'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            {/* Delete User Section */}
+            {/* Delete User */}
             <div className="card" style={{ borderColor: 'var(--danger)' }}>
               <div className="card-header">
                 <h2 className="card-title" style={{ margin: 0, color: 'var(--danger)' }}>Delete User</h2>
@@ -432,9 +278,6 @@ export default function CreateUserPage() {
                       onChange={e => setDeleteEmail(e.target.value)}
                       required
                     />
-                    <span className="form-hint" style={{ color: 'var(--danger)' }}>
-                      This permanently deletes the user account. Cannot be undone.
-                    </span>
                   </div>
                   <button
                     type="submit"
@@ -448,6 +291,7 @@ export default function CreateUserPage() {
                 </form>
               </div>
             </div>
+
             {/* Admin Users List */}
             <div className="card">
               <div className="card-header">
@@ -460,46 +304,75 @@ export default function CreateUserPage() {
                 ) : admins.length === 0 ? (
                   <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No admin users found.</div>
                 ) : (
-                  <div className="table-container" style={{ maxHeight: '280px', overflowY: 'auto' }}>
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Email</th>
-                          <th>Name</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {admins.map(a => (
-                          <tr key={a.id}>
-                            <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{a.email}</td>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                <span>{a.first_name || a.last_name ? `${a.first_name} ${a.last_name}`.trim() : '—'}</span>
-                                {a.email_verified_at ? (
-                                  <span
-                                    className="badge badge-active"
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                                    title={`Email verified ${formatDate(a.email_verified_at)}`}
-                                  >
-                                    <CheckIcon size={12} /> Verified
-                                  </span>
-                                ) : a.invited_at ? (
-                                  <span className="badge badge-new" title={`Invited ${formatDate(a.invited_at)}`}>
-                                    Invite pending
-                                  </span>
-                                ) : (
-                                  <span className="badge badge-dormant" title="Set up outside the invitation flow">
-                                    Active
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                    {admins.map(a => {
+                      const name = a.first_name || a.last_name ? `${a.first_name || ''} ${a.last_name || ''}`.trim() : '—'
+                      return (
+                        <div key={a.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{name}</span>
+                            {a.email_verified_at ? (
+                              <span
+                                className="badge badge-active"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                title={`Email verified ${formatDate(a.email_verified_at)}`}
+                              >
+                                <CheckIcon size={12} /> Verified
+                              </span>
+                            ) : a.invited_at ? (
+                              <span className="badge badge-new" title={`Invited ${formatDate(a.invited_at)}`}>
+                                Invite pending
+                              </span>
+                            ) : (
+                              <span className="badge badge-dormant" title="Set up outside the invitation flow">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: '2px', wordBreak: 'break-all' }}>
+                            {a.email}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Test Email */}
+            <div className="card">
+              <div className="card-header">
+                <h2 className="card-title" style={{ margin: 0 }}>Test Email</h2>
+              </div>
+              <div className="card-body">
+                {testResult && (
+                  <div className="settings-alert success" style={{ marginBottom: '12px' }}>{testResult}</div>
+                )}
+                {testError && (
+                  <div className="settings-alert error" style={{ marginBottom: '12px' }}>{testError}</div>
+                )}
+                <form onSubmit={handleTestEmail}>
+                  <div className="form-group">
+                    <label className="form-label">Email Address</label>
+                    <input
+                      className="form-input"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={testEmail}
+                      onChange={e => setTestEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="btn btn-ghost"
+                    disabled={testing}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}
+                  >
+                    {testing ? 'Sending…' : 'Send Test Email'}
+                  </button>
+                </form>
               </div>
             </div>
           </div>

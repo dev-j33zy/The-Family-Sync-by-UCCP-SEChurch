@@ -11,6 +11,8 @@ export default function ResetPasswordPage() {
 
   const [status, setStatus] = useState(token ? 'checking' : 'invalid') // checking | invalid | ready | saving
   const [details, setDetails] = useState(null)
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -41,6 +43,10 @@ export default function ResetPasswordPage() {
     e.preventDefault()
     setError('')
 
+    if (isInvite && (!firstName.trim() || !lastName.trim())) {
+      setError('First name and last name are required')
+      return
+    }
     if (password !== confirm) {
       setError('The passwords do not match')
       return
@@ -52,10 +58,16 @@ export default function ResetPasswordPage() {
 
     setStatus('saving')
     try {
+      const payload = { token, password }
+      if (isInvite) {
+        payload.first_name = firstName.trim()
+        payload.last_name = lastName.trim()
+      }
+
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Could not set the password')
@@ -127,6 +139,37 @@ export default function ResetPasswordPage() {
             {error && <div className="login-error" style={{ marginBottom: '16px' }}>{error}</div>}
 
             <form className="login-form" onSubmit={handleSubmit}>
+              {isInvite && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="first-name">First Name</label>
+                    <input
+                      id="first-name"
+                      type="text"
+                      className="form-input"
+                      placeholder="Juan"
+                      value={firstName}
+                      onChange={e => setFirstName(e.target.value)}
+                      autoComplete="given-name"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="last-name">Last Name</label>
+                    <input
+                      id="last-name"
+                      type="text"
+                      className="form-input"
+                      placeholder="Dela Cruz"
+                      value={lastName}
+                      onChange={e => setLastName(e.target.value)}
+                      autoComplete="family-name"
+                      required
+                    />
+                  </div>
+                </>
+              )}
               <div className="form-group">
                 <label className="form-label" htmlFor="new-password">New Password</label>
                 <input
@@ -139,7 +182,7 @@ export default function ResetPasswordPage() {
                   autoComplete="new-password"
                   minLength={MIN_PASSWORD_LENGTH}
                   required
-                  autoFocus
+                  autoFocus={!isInvite}
                 />
                 <span className="form-hint">At least {MIN_PASSWORD_LENGTH} characters</span>
               </div>
