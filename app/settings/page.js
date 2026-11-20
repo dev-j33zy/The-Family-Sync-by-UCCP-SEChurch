@@ -954,9 +954,29 @@ export default function SettingsPage() {
 
           {activeTab === 'admin' && (
           <div role="tabpanel" id="settings-panel-admin" aria-labelledby="settings-tab-admin" className="settings-grid">
+              {canManageUsers && <PendingPhotoReview />}
+
+              {canManageUsers && (
+                <div className="card">
+                  <div className="card-header">
+                    <h2 className="card-title" style={{ margin: 0 }}>New User</h2>
+                  </div>
+                  <div className="card-body">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => router.push('/admin/create-user')}
+                    >
+                      <PlusIcon size={16} />
+                      Add New User
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="card">
                 <div className="card-header">
-                  <h2 className="card-title" style={{ margin: 0 }}>Admin</h2>
+                  <h2 className="card-title" style={{ margin: 0 }}>Developer</h2>
                 </div>
                 <div className="card-body">
                   <div className="form-group">
@@ -977,26 +997,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
-
-              {canManageUsers && <PendingPhotoReview />}
-
-              {canManageUsers && (
-                <div className="card">
-                  <div className="card-header">
-                    <h2 className="card-title" style={{ margin: 0 }}>New User</h2>
-                  </div>
-                  <div className="card-body">
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => router.push('/admin/create-user')}
-                    >
-                      <PlusIcon size={16} />
-                      Add New User
-                    </button>
-                  </div>
-                </div>
-              )}
           </div>
           )}
         </div>
